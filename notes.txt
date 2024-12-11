@@ -1,0 +1,254 @@
+ssh-keygen
+firewall-cmd --set-default-zone=home
+firewall-cmd --zone=home --add-port=22/tcp
+firewall-cmd --reload
+dnf install -y oracle-database-preinstall-21c
+dnf install -y ./oracle-database-ee-21c-1.0-1.ol8.x86_64.rpm 
+Edit /etc/hosts to include an entry for hostname.
+/etc/init.d/oracledb_ORCLCDB-21c configure
+
+Edit /home/oracle/.bash_profile to include
+export ORACLE_SID=ORCLCDB
+export ORAENV_ASK=NO
+. /opt/oracle/product/21c/dbhome_1/bin/oraenv
+
+usermod -aG libvirt gilly/asterion
+
+Change database passwords...
+
+
+dnf groupinstall -y --with-optional 'Virtualization Host'
+setsebool -P virt_use_fusefs 1
+setsebool -P virt_use_samba 1
+
+firewall-cmd --zone=libvirt --add-port=1521/tcp --permanent
+firewall-cmd --reload
+
+sudo sh -c 'echo "metadata_timer_sync=0" >> /etc/dnf/dnf.conf'  # needed for low-memory instances.
+
+OracleLinux
+--------------------------------------
+All of this can be adapted to run w/in AsterionDB.
+
+https://blogs.oracle.com/linux/post/a-quick-start-with-the-oracle-linux-templates-for-kvm
+https://yum.oracle.com/oracle-linux-templates.html
+
+contents of: meta-data
+instance-id: qcow2-test
+local-hostname: jjflash-ol8.asteriondb.local
+
+contents of: user-data
+#cloud-config
+password: xxxxx
+chpasswd: { expire: False }
+ssh_pwauth: True
+system_info:
+  default_user:
+    name: gilly
+
+contents of: network-data
+version: 1
+config:
+  - type: physical
+    name: eth0
+    subnets:
+      - type: static
+        control: auto
+        address: 192.168.1.41
+        gateway: 192.168.1.254
+        netmask: 255.255.255.0
+        dns_nameservers:
+          - 192.168.1.15
+        dns_search:
+          - asteriondb.local
+          - asteriondb.com
+
+
+This command creates the CD image that is used when producing a OL8.10 installation.
+genisoimage -output {new-image}.iso -volid cidata -joliet -rock --graft-points user-data={user-data.txt} meta-data={meta-data.txt} network-config={network-config.txt}
+
+genisoimage -output /mnt/dbObscuraOra/dev/FZGtohAKDqhkEnUUcVImTJOZJebuTiSKBENSYIbkRYeWXdqk/ISYzVyqOEinHPSVFuuCdvvEutnIrnEJRxAuohIYFmBZobxpMTgATZveCGhqIDzfC.iso -volid cidata -joliet -rock --graft-points user-data=/mnt/dbObscuraOra/dev/VxfsHmDBZWwbbNBMlgEtoCzWeWHRHJCzqMODqwUAzINsdqgM/ZjLJFTCzTnKPvGAQiLeRJVMloSmStfiDFTaMcEyKzYSmCUQiTsKmMsxNBxbyykDZ.txt meta-data=/mnt/dbObscuraOra/dev/qHXYpupvudsyynRImqTkMicFwcNhAANBmtnqbrGLvunlGtwH/iSXLpwqnkkFpuDxgXgpafXUilHVScYMfvlsqxEpWdtgWvDsTbdLlRQpTaseRUDTf.txt
+
+Copy the seed image as a new qcow2 file.
+cp /var/lib/libvirt/images/{ol8-x-seed}.qcow2 /var/lib/libvirt/images/{new-image}.qcow2
+
+cp /mnt/dbObscuraOra/dev/OTUiFzFyTsBUdlfLwuDFGmMYcBFIOVsnTOXPIaSmlcKKdiZE/XBLbkyrqUarTVylmHZklLxyhWOPjUmczCRkyUjdooPjdYDZsBuvpgYltPbLEkTpX.qcow2-seed /mnt/dbObscuraOra/dev/VhqUZOPYVyiHZLregIAlCCQOWMrCoRXkrPCWZixHioCHuiOD/duWlptvsuiWOfnJNOldztolPxCswkeSAGOneKTdmxZkFVGUxZgGoWzSawPhaYOsB.qcow2
+
+Create a new instance...!!!  Can be run as a user in the libvirt group.
+virt-install --name qcow2-test --memory 1024 --vcpus 2 --disk {new-image}.qcow2 --disk {new-image}.iso,device=cdrom  --os-variant ol8.x --virt-type kvm --network network=default,model=virtio --import --connect qemu:///system
+
+virt-install --name jjflash-test-compute-1 --memory 1024 --vcpus 1 --disk /mnt/dbObscuraOra/dev/VhqUZOPYVyiHZLregIAlCCQOWMrCoRXkrPCWZixHioCHuiOD/duWlptvsuiWOfnJNOldztolPxCswkeSAGOneKTdmxZkFVGUxZgGoWzSawPhaYOsB.qcow2 --disk /mnt/dbObscuraOra/dev/ktBgWofyyzpVhIbpIjMwjuYfaAFPixXyiSwohrdOnDDSBkvs/ZdMMZGoKtGvFlDwgSlKPzEEvnPPkfUYAeRbHDLJcYrtTvavFpNiBpzoNtcxEaMLX.iso,device=cdrom --os-variant ol8.10 --virt-type kvm --network network=default,model=virtio --import
+
+--noautoconsole prevents the viewer from being called upon creation of the VM.
+
+virsh -c qemu:///system undefine woody-test
+
+
+---------------------------------------------
+
+begin vm_manager.start_virtual_machine(1006); end;
+begin vm_manager.undefine_virtual_machine(1006); end;
+begin vm_manager.stop_virtual_machine(1006); end;
+
+begin vm_manager.start_virtual_machine(1031); end;
+begin vm_manager.undefine_virtual_machine(1031); end;
+begin vm_manager.stop_virtual_machine(1031); end;
+
+alter table virtual_machines drop column first_boot;
+    check (boot_device in ('disk', 'cdrom'));
+
+
+declare
+
+  l_virtual_disk_id             virtual_machines.virtual_disk_id%type;
+  
+begin
+
+  l_virtual_disk_id := vm_manager.create_virtual_disk(p_user_id => 172, p_disk_image_name => 'alpine-virt-3.20.1-x86_64.qcow2');
+  dbms_output.put_line(l_virtual_disk_id);
+  
+end;
+
+declare
+
+  l_vm_id                         virtual_machines.vm_id%type;
+  
+begin
+    
+  l_vm_id := vm_manager.create_virtual_machine(p_user_id => 172, p_machine_name => 'alpine-virt-3.20.1-x86_64', p_virtual_disk_id => 'IQ6SKTMLO4EI01WRYFKG7GWMXA6GYKWS', p_virtual_disk_size => 5, p_virtual_cdrom_id => 'I7UEIWK07IWWLPVWMJK53GBIZKGO33X2',
+    p_os_variant => 'alpinelinux3.19', p_boot_device => 'cdrom');
+  dbms_output.put_line(l_vm_id);
+  
+end;
+
+declare
+
+  l_virtual_disk_id             virtual_machines.virtual_disk_id%type;
+  
+begin
+
+  l_virtual_disk_id := vm_manager.create_virtual_disk(p_user_id => 172, p_disk_image_name => 'hunter-test-2.qcow2');
+  dbms_output.put_line(l_virtual_disk_id);
+  
+end;
+
+declare
+
+  l_vm_id                         virtual_machines.vm_id%type;
+  
+begin
+    
+  l_vm_id := vm_manager.create_virtual_machine(p_user_id => 172, p_machine_name => 'alpine-virt-3.20.1-x86_64', p_virtual_disk_id => 'IQ6SKTMLO4EI01WRYFKG7GWMXA6GYKWS', p_virtual_disk_size => 5, p_virtual_cdrom_id => 'I7UEIWK07IWWLPVWMJK53GBIZKGO33X2',
+    p_os_variant => 'alpinelinux3.19', p_boot_device => 'cdrom');
+  dbms_output.put_line(l_vm_id);
+  
+end;
+
+declare
+
+  l_object_id                       vault_objects.object_id%type;
+  
+begin
+
+  l_object_id := vm_manager.create_virtual_disk(172, 'hunter-test.qcow2', 'LJU2IS242NKA2N9ZGYTS8H9VDO9UEK6B');
+  
+end;
+
+    
+declare
+
+  l_object_id                         vault_objects.object_id%type;
+  l_authorized_ssh_keys               json_array_t := json_array_t;
+  l_dns_nameservers                   json_array_t := json_array_t;
+  l_dns_search                        json_array_t := json_array_t;
+  
+begin
+
+  l_authorized_ssh_keys.append('ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDO071PL+La0490L0w3jKvkYvISN68sf5jm/AB3GagCP/a+XXr2qV54KiCcRtRse02uwhBTKj7/OMkBA/ldqjrV0NlIS0/XrqrxffX+rS3IqjW0AwGtETvStNB/wnE3wCApYNXAaIuzFkA3zZmqehbxP/u9/s9GbLuIMBmlEesSJ3LyE2ioi8v8pVzuuCbTkCPqhWA9IJOV9Nmhw8uq50liVeYIGX2QUmy9Yz1qYPGkqVFjFC1jBkuMc7TGt38JJJAEkjMaI/NujVE84hiVfDtiJmQLsZv2g8zaehObUG7fG9+0wg8Gh957QYwE4JhSCY2czqKG5HVkOJXsurhtXgp1 gilly@hunter.asteriondb.local');
+  l_dns_nameservers.append('192.168.1.15');
+  l_dns_search.append('asteriondb.local');
+  l_dns_search.append('asteriondb.com');
+  
+  l_object_id := vm_manager.create_cloud_init_cdrom_image(172, 'hunter-test', 'hunter-test.asteriondb.local', 'gilly', l_authorized_ssh_keys, null,
+    '192.168.1.41', '192.168.1.254', '255.255.255.0', l_dns_nameservers, l_dns_search);
+
+  dbms_output.put_line(l_object_id);    
+  
+end;
+
+declare
+
+  l_vm_id                         virtual_machines.vm_id%type;
+  
+begin
+    
+  l_vm_id := vm_manager.create_virtual_machine(p_user_id => 172, p_machine_name => 'hunter-test', p_virtual_disk_id => 'HXRXAIO48G9UXG7I3UFYXC8EW0FWBNPK', p_virtual_disk_size => 5, p_virtual_cdrom_id => 'C95XDRMRCKJONXL4LNMME6GN945019W7',
+    p_os_variant => 'ol8.10');
+  dbms_output.put_line(l_vm_id);
+  
+end;
+
+
+declare
+
+  l_virtual_disk_id                   virtual_machines.virtual_disk_id%type;
+  l_object_id                         vault_objects.object_id%type;
+  l_authorized_ssh_keys               json_array_t := json_array_t;
+  l_dns_nameservers                   json_array_t := json_array_t;
+  l_dns_search                        json_array_t := json_array_t;
+  l_vm_id                             virtual_machines.vm_id%type;
+  
+begin
+
+  l_virtual_disk_id := vm_manager.create_virtual_disk(p_user_id => 172, p_disk_image_name => 'woody-test.qcow2', p_seed_image_id => '8P8FNDG1UT4W04RI33OPZKANF0B0B2TJ');
+  
+  l_authorized_ssh_keys.append('ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDO071PL+La0490L0w3jKvkYvISN68sf5jm/AB3GagCP/a+XXr2qV54KiCcRtRse02uwhBTKj7/OMkBA/ldqjrV0NlIS0/XrqrxffX+rS3IqjW0AwGtETvStNB/wnE3wCApYNXAaIuzFkA3zZmqehbxP/u9/s9GbLuIMBmlEesSJ3LyE2ioi8v8pVzuuCbTkCPqhWA9IJOV9Nmhw8uq50liVeYIGX2QUmy9Yz1qYPGkqVFjFC1jBkuMc7TGt38JJJAEkjMaI/NujVE84hiVfDtiJmQLsZv2g8zaehObUG7fG9+0wg8Gh957QYwE4JhSCY2czqKG5HVkOJXsurhtXgp1 gilly@hunter.asteriondb.local');
+  l_authorized_ssh_keys.append('ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC/ygf5b1dbZclXYVmkL1uXlYC3zdOHG6Dr4sJJtj1HtmJZE9g3K3ZAbusNY/X6/TQbAQ1RhQapx/cmfMLxZETYOPa6yMkNVX1SLRlmBNxY/WIAgANX9U+fGLVOVzO3sUTxIdLll/ERnpnxSi9sBfxgLVZDkZe/oFHQM0u5pnb9kqGmK1d+jEVhFwdWiBlzWdLl1zAHD4luDf259AW0q/ECkqizvQJh/hD+4fmdmEy6fcR06pQLoyFUTbtWSRQtqN3IEbfLA2DpYJUgZLPe2DZivgcmQjJayGk/wn1rmJWDY7gV/6xFSyL3+D2GvK6u3CfQPLsCJqrF+wOL6exDIh7Kdg1iJYLNbBY/OeN81sqp7ga2pCu5HnsR5MrBdjcrzU7EqMR7NKengaMOC9T+/38dB92CTat+wFbX6Tm/UJ0W+ci5fVRsMtuubgvX5JFBWTESPvilHV1LZYv/zbX73NJVBTGe+MuhYmz2DB20g26AJWGAeviAcOWe/CIxBmtnx78= gilly@woody.asteriondb.local');
+  l_dns_nameservers.append('192.168.1.15');
+  l_dns_search.append('asteriondb.local');
+  l_dns_search.append('asteriondb.com');
+  
+  l_object_id := vm_manager.create_cloud_init_cdrom_image(172, 'woody-test', 'woody-test.asteriondb.local', 'gilly', l_authorized_ssh_keys, 'virbr0',
+    '192.168.1.20', '192.168.1.254', '255.255.255.0', l_dns_nameservers, l_dns_search);
+  dbms_output.put_line(l_object_id);
+    
+  l_vm_id := vm_manager.create_virtual_machine(p_user_id => 172, p_machine_name => 'woody-test', p_virtual_disk_id => l_virtual_disk_id, p_virtual_cdrom_id => l_object_id,
+    p_os_variant => 'ol8.10', p_vcpu_count => 2, p_virtual_memory => 2048, p_network_source => 'bridge', p_network_device => 'virbr0');
+
+  vm_manager.undefine_virtual_machine(l_vm_id);
+  dbms_output.put_line(l_vm_id);
+  
+end;
+
+----------------------------------
+
+
+Creating VM's
+----------------------------------------
+For a VM Image, the uid:gid of the subdir and filename is root:root; the mod-bits for the subdir are 705 and 600 for the filename. Disable stream write.
+For a CD Image, the uid:gid of the subdir is root:root - file is qemu:qemu; the mod-bits for the subdir are 705 and 701 for the filename.
+
+https://blogs.oracle.com/linux/post/a-quick-start-with-the-oracle-linux-templates-for-kvm
+
+Step-by-Step....for OL8
+----------------------------------------
+Create meta-data.txt & user-data.txt in AsterionDB
+Generate a filename for the new iso image (holds the content of meta-data.txt & user-data.txt for cloud-init). Filename can be for one-time use.
+Generate filenames for meta-data.txt & user-data.txt
+Use the genisoimage command shown above.
+Generate a read-only filename for the OL8 VM Seed
+Generate a filename for a new qcow2 image for the VM machine
+Copy the OL8 VM Seed to the new VM Image
+Generate a read/write filename for the OL8 ISO image w/ permissions & ownership as shown above
+Generate a read/write filenme for the qcow2 image w/ permissions & ownership as shown above, no expire, unlimited access, disable stream write.
+
+
+FreeDOS
+-----------------------------------------
+Why not!
+Import FD13LIVE.iso into AsterionDB. Use this as the seed/boot image (CD).
+Create an object for the following command:
+qemu-img create -f qcow2 /mnt/dbObscuraOra/dev/DPYORUnzEjFNcDXEeEeMSacjNVVOUxrjaZaRGargFAixZGNM/AFjIuOeRltdmRejeIfeidOljENKsgpvObFWPLWALTDDYFaLOfNgDVywFTuBbEafN.qcow2 500m
+
+
+

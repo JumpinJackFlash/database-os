@@ -1,0 +1,15 @@
+version: 1
+config: 
+  - type: physical
+    name: eth0
+    subnets:
+      - type: static
+        control: auto
+        address: 192.168.1.21
+        gateway: 192.168.1.254
+        netmask: 255.255.255.0
+        dns_nameservers:
+          - 192.168.1.15
+        dns_search:
+          - asteriondb.local
+          - asteriondb.com

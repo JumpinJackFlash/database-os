@@ -1,0 +1,6 @@
+#cloud-config
+user: gilly
+ssh_pwauth: True
+ssh_authorized_keys: 
+  - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDO071PL+La0490L0w3jKvkYvISN68sf5jm/AB3GagCP/a+XXr2qV54KiCcRtRse02uwhBTKj7/OMkBA/ldqjrV0NlIS0/XrqrxffX+rS3IqjW0AwGtETvStNB/wnE3wCApYNXAaIuzFkA3zZmqehbxP/u9/s9GbLuIMBmlEesSJ3LyE2ioi8v8pVzuuCbTkCPqhWA9IJOV9Nmhw8uq50liVeYIGX2QUmy9Yz1qYPGkqVFjFC1jBkuMc7TGt38JJJAEkjMaI/NujVE84hiVfDtiJmQLsZv2g8zaehObUG7fG9+0wg8Gh957QYwE4JhSCY2czqKG5HVkOJXsurhtXgp1 gilly@hunter.asteriondb.local
+

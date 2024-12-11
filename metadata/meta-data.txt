@@ -1,0 +1,2 @@
+instance-id: woody-eval
+local-hostname: woody-eval.asteriondb.local
