@@ -2,10 +2,15 @@
 
 ## December 13th, 2024 ##
 ### Recap of development... ###
-1. Code up a login page in the vm-manager web-app.
+1. Start coding up a login page in the vm-manager web-app.
+2. Created middleware.ts to handle re-directs
+3. Created serverActions.getLoginPageSettings
+4. Started to integrate NextUI into the design
+5. 
 
 ### Music on the playlist...  ###
 1. Mozart - A Little Night Muzik...
+2. Faces - A Nod Is As Good As A Wink
 
 ## December 12th, 2024 ##
 ### Recap of development... ###
