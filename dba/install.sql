@@ -1,3 +1,11 @@
+create or replace synonym asteriondb_dbos.db_twig for dbtwig.db_twig;
+grant execute on dbtwig.db_twig to asteriondb_dbos;
+
+create or replace synonym asteriondb_dbos.vault_objects for asteriondb_dgbunker.vault_objects;
+grant references(object_id), read on asteriondb_dgbunker.vault_objects to asteriondb_dbos;
+
+create sequence id_seq minvalue 1 maxvalue 999999999999 cycle;
+
 create table virtual_machines
 (
   vm_id                             number(12) primary key,
@@ -17,6 +25,9 @@ create table virtual_machines
   assigned_to_host                  varchar2(256)
 );
 
-insert into object_vault_extensions values ('Virtual Machines', '{}');
+@$HOME/asterion/oracle/dbTwig/dba/middleTierMap.sql
+
+grant execute on &4..restapi to &3;
+grant select on &4..middle_tier_map to &3;
 
 commit;

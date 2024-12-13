@@ -4,7 +4,7 @@ rem
 rem  Oracle Cloud Infrastructure
 rem
 
-@extractPackageHeader vm_manager &git_home/digitalBunker/extensions/virtualMachines/dba
-@preWrapPackageBody vm_manager &git_home/digitalBunker/extensions/virtualMachines/dba
+@extractPackageHeader vm_manager &git_home/database-os/dba
+@preWrapPackageBody vm_manager &git_home/database-os/dba
 
 exit;
