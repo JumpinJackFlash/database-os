@@ -11,6 +11,6 @@
 1. Enrolled dbos as a service in dbtwig.  
 1. Setup call to dbTwig in vm-manager web-app.  
 
-### Music on the playlist... ###
+### Music on the playlist... I mainly listen to Jazz & Classic Rock ###
 1. King Sunny Ade - Ade Special  
 1. Mott The Hoople - Mott  
