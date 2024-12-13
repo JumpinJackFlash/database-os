@@ -1,5 +1,12 @@
 # A diary of development activities... #
 
+## December 13th, 2024 ##
+### Recap of development... ###
+1. Code up a login page in the vm-manager web-app.
+
+### Music on the playlist...  ###
+1. Mozart - A Little Night Muzik...
+
 ## December 12th, 2024 ##
 ### Recap of development... ###
 1. Got a bright idea, keep a daily log!!!  
@@ -14,7 +21,7 @@
 3. Mapped a call to get_list_of_virtual_machines out through dbTwig.
 4. Created getListOfVirtualMachines function in vm_manager web-app. It works!!!
 
-### Music on the playlist... I mainly listen to Jazz & Classic Rock ###
+### Music on the playlist... I mainly listen to Jazz & Classical Music, Hank & Classic Rock ###
 1. King Sunny Ade - Ade Special  
 1. Mott The Hoople - Mott
 1. Lou Reed - Rock N Roll Animal
