@@ -6,11 +6,15 @@
 2. Created middleware.ts to handle re-directs
 3. Created serverActions.getLoginPageSettings
 4. Started to integrate NextUI into the design
-5. 
+5. Use NextUI Pro's Login page.
+6. Created serverActions.createUserSession and serverActions.terminateUserSession
+7. Created VirtualMachines page
+8. Worked out session creation and termination.
 
 ### Music on the playlist...  ###
 1. Mozart - A Little Night Muzik...
 2. Faces - A Nod Is As Good As A Wink
+3. Led Zeppelin IV
 
 ## December 12th, 2024 ##
 ### Recap of development... ###
