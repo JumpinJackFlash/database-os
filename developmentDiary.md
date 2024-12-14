@@ -2,6 +2,15 @@
 
 ## December 13th, 2024 ##
 ### Recap of development... ###
+1. Had a big debate today with myself on whether to use JWT or not. Not...!!! We enforce session checking on every call to the DB. I left in the hooks for JWT Secret/Signing Key and JWT Expires In for optomistic middle-tier session checking if it's ever needed.
+
+### Music on the playlist...  ###
+1. Neil Young - Neil Young
+2. David Bowie - Live at the SMO Civic '72
+3. Steely Dan - Pretzel Logic
+
+## December 13th, 2024 ##
+### Recap of development... ###
 1. Start coding up a login page in the vm-manager web-app.
 2. Created middleware.ts to handle re-directs
 3. Created serverActions.getLoginPageSettings
