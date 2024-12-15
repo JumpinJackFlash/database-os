@@ -1,7 +1,11 @@
 create or replace
 package body vm_manager as
 
-  PLUGIN_MODULE                       constant plugin_modules.plugin_module%type := 'virtualMachines';
+  PLUGIN_MODULE                       constant varchar2(15) := 'virtualMachines';
+
+  SERVICE_NAME                        constant varchar2(4) := 'dbos';
+  SERVICE_TITLE                       constant varchar2(27) := 'AsterionDB - Database O/S';
+
   s_plugin_process                    json_object_t;
 
   procedure start_virtual_machine_action
@@ -21,11 +25,11 @@ package body vm_manager as
     l_json_parameters                 json_object_t := json_object_t;
     l_virtual_disk_filename           varchar2(256) := 'null';
     l_virtual_cdrom_filename          varchar2(256) := 'null';
-    l_item_id                         object_versions.item_id%type;
+    l_object_id                       vault_objects.object_id%type;
     l_object_created                  vault_objects.object_created%type;
 
   begin
-
+/*
     select  *
       into  l_virtual_machine
       from  virtual_machines
@@ -87,7 +91,8 @@ package body vm_manager as
          set  virtual_cdrom_id = null
        where  vm_id = p_vm_id;
 
-    end if;
+    end if; */
+    null;
 
   end start_virtual_machine_action;
 
@@ -97,7 +102,6 @@ package body vm_manager as
 
   function create_cloud_init_cdrom_image
   (
-    p_user_id                         virtual_machines.user_id%type,
     p_machine_name                    virtual_machines.machine_name%type,
     p_local_hostname                  varchar2,
     p_user                            varchar2,
@@ -131,7 +135,7 @@ package body vm_manager as
     l_json_parameters                 json_object_t := json_object_t;
 
   begin
-
+/*
     l_meta_data_id := digital_bunker.create_an_object(p_user_id => p_user_id, p_source_path => 'meta-data.txt',
         p_client_address => sys_context('userenv', 'ip_address'), p_program_name => 'vm_manager',
         p_modification_date => null);
@@ -246,14 +250,13 @@ package body vm_manager as
     l_json_response := dbplugin_api.call_plugin(s_plugin_process, 'createCloudInitCdrom', l_json_parameters);
 
     dbplugin_api.disconnect_from_plugin_server(s_plugin_process);                 -- Disconnect from the plugin.
-
+*/
     return l_cdrom_id;
 
   end create_cloud_init_cdrom_image;
 
   function create_cloud_init_cdrom_image
   (
-    p_user_id                         virtual_machines.user_id%type,
     p_machine_name                    virtual_machines.machine_name%type,
     p_meta_data_file                  vault_objects.object_id%type,
     p_user_data_file                  vault_objects.object_id%type,
@@ -279,10 +282,20 @@ package body vm_manager as
 
   end create_cloud_init_cdrom_image;
 
+  procedure create_dbos_service
+
+  is
+
+  begin
+
+    db_twig.create_dbtwig_service(p_service_name => SERVICE_NAME, p_service_owner => sys_context('USERENV', 'CURRENT_USER'),
+      p_session_validation_procedure => 'vm_manager.validate_session');
+
+  end create_dbos_service;
+
   function create_virtual_disk
   (
-    p_user_id                         virtual_machines.user_id%type,
-    p_disk_image_name                 object_versions.source_path%type,
+    p_disk_image_name                 varchar2,
     p_seed_image_id                   vault_objects.object_id%type
   )
   return vault_objects.object_id%type
@@ -291,7 +304,7 @@ package body vm_manager as
 
     l_dest_object_id                  vault_objects.object_id%type;
 
-    l_source_data_type                object_types.data_type%type;
+--    l_source_data_type                object_types.data_type%type;
 
     l_source_clob                     clob;
     l_source_blob                     blob;
@@ -300,7 +313,7 @@ package body vm_manager as
     l_dest_blob                       blob;
 
   begin
-
+/*
     select  data_type
       into  l_source_data_type
       from  object_types t, file_extensions e, vault_objects o
@@ -335,31 +348,31 @@ package body vm_manager as
         p_for_update => restapi.OPTION_ENABLED);
 
     end if;
-
+*/
     return l_dest_object_id;
 
   end create_virtual_disk;
 
   function create_virtual_disk
   (
-    p_user_id                         virtual_machines.user_id%type,
-    p_disk_image_name                 object_versions.source_path%type
+    p_disk_image_name                 varchar2
   )
   return vault_objects.object_id%type
 
   is
 
   begin
-
+/*
     return digital_bunker.create_an_object(p_user_id => p_user_id, p_source_path => p_disk_image_name,
       p_client_address => sys_context('userenv', 'ip_address'), p_program_name => 'vm_manager',
       p_modification_date => null);
+*/
+    return null;
 
   end create_virtual_disk;
 
   function create_virtual_machine
   (
-    p_user_id                         virtual_machines.user_id%type,
     p_machine_name                    virtual_machines.machine_name%type,
     p_virtual_disk_id                 virtual_machines.virtual_disk_id%type,
     p_os_variant                      virtual_machines.os_variant%type,
@@ -381,7 +394,7 @@ package body vm_manager as
     l_object_created                  vault_objects.object_created%type;
 
   begin
-
+/*
     if p_virtual_disk_id is null and p_virtual_cdrom_id is null then
 
       error_logging.raise_api_error(error_logging.GENERIC_EXTENSION_ERROR, 'A virtual disk or cdrom must be specified.');
@@ -419,7 +432,7 @@ package body vm_manager as
 
     start_virtual_machine_action(p_vm_id => l_vm_id, p_virtual_disk_size => p_virtual_disk_size, p_sparse_disk_allocation => p_sparse_disk_allocation,
       p_boot_device => p_boot_device, p_remove_cdrom_after_first_boot => p_remove_cdrom_after_first_boot, p_first_boot => 'Y');
-
+*/
     return l_vm_id;
 
   end create_virtual_machine;
@@ -438,6 +451,62 @@ package body vm_manager as
      where  vm_id = p_vm_id;
 
   end delete_virtual_machine;
+
+  function get_list_of_virtual_machines
+  (
+    p_json_parameters                 json_object_t
+  )
+  return clob
+
+  is
+
+    l_result                          clob;
+    l_rows                            pls_integer;
+
+  begin
+
+    select  count(*), json_object('virtualMachines' is json_arrayagg(
+                        json_object('vmId'            is vm_id,
+                          'creationTimestamp' is db_twig.convert_date_to_unix_timestamp(creation_timestamp),
+                          'machineName'       is machine_name,
+                          'virtualDiskId'     is virtual_disk_id,
+                          'virtualCdromId'    is virtual_cdrom_id,
+                          'vCpuCount'         is vcpu_count,
+                          'virtualMemory'     is virtual_memory,
+                          'osVariant'         is os_variant,
+                          'networkSource'     is network_source,
+                          'networkDevice'     is network_device,
+                          'assignedToHost'    is assigned_to_host) order by machine_name returning clob) returning clob)
+      into  l_rows, l_result
+      from  virtual_machines;
+
+      if 0 = l_rows then
+
+        return db_twig.empty_json_array('virtualMachines');
+
+      end if;
+
+      return l_result;
+
+  end get_list_of_virtual_machines;
+
+  function get_service_data
+  (
+    p_json_parameters                 json_object_t
+  )
+  return clob
+
+  is
+
+    l_service_data                    json_object_t := json_object_t(db_twig.get_service_data(SERVICE_NAME));
+
+  begin
+
+    l_service_data.put('serviceTitle', SERVICE_TITLE);
+    l_service_data.put('serviceName', SERVICE_NAME);
+    return l_service_data.to_clob;
+
+  end get_service_data;
 
   procedure start_virtual_machine
   (
@@ -465,7 +534,7 @@ package body vm_manager as
     l_json_response                   json_object_t;
 
   begin
-
+/*
     select  *
       into  l_virtual_machine
       from  virtual_machines
@@ -475,6 +544,9 @@ package body vm_manager as
     l_json_parameters.put('machineName', l_virtual_machine.machine_name);
     l_json_response := dbplugin_api.call_plugin(s_plugin_process, 'undefineVirtualMachine', l_json_parameters);
     dbplugin_api.disconnect_from_plugin_server(s_plugin_process);                 -- Disconnect from the plugin.
+*/
+
+    null;
 
   end undefine_virtual_machine;
 
@@ -490,7 +562,7 @@ package body vm_manager as
     l_json_response                   json_object_t;
 
   begin
-
+/*
     select  *
       into  l_virtual_machine
       from  virtual_machines
@@ -500,8 +572,26 @@ package body vm_manager as
     l_json_parameters.put('machineName', l_virtual_machine.machine_name);
     l_json_response := dbplugin_api.call_plugin(s_plugin_process, 'stopVirtualMachine', l_json_parameters);
     dbplugin_api.disconnect_from_plugin_server(s_plugin_process);                 -- Disconnect from the plugin.
+*/
+
+    null;
 
   end stop_virtual_machine;
+
+  procedure validate_session
+  (
+    p_json_parameters                 json_object_t,
+    p_required_authorization_level    middle_tier_map.required_authorization_level%type,
+    p_allow_blocked_session           middle_tier_map.allow_blocked_session%type
+  )
+
+  is
+
+  begin
+
+    null;
+
+  end validate_session;
 
 end vm_manager;
 /

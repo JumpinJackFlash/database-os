@@ -30,4 +30,9 @@ create table virtual_machines
 grant execute on &4..restapi to &3;
 grant select on &4..middle_tier_map to &3;
 
+begin vm_manager.create_dbos_service; end;
+.
+/
+
 commit;
+

@@ -5,7 +5,6 @@ as
 
   function create_cloud_init_cdrom_image
   (
-    p_user_id                         virtual_machines.user_id%type,
     p_machine_name                    virtual_machines.machine_name%type,
     p_local_hostname                  varchar2,
     p_user                            varchar2,
@@ -21,7 +20,6 @@ as
 
   function create_cloud_init_cdrom_image
   (
-    p_user_id                         virtual_machines.user_id%type,
     p_machine_name                    virtual_machines.machine_name%type,
     p_meta_data_file                  vault_objects.object_id%type,
     p_user_data_file                  vault_objects.object_id%type,
@@ -29,24 +27,23 @@ as
   )
   return vault_objects.object_id%type;
 
+  procedure create_dbos_service;
+
   function create_virtual_disk
   (
-    p_user_id                         virtual_machines.user_id%type,
-    p_disk_image_name                 object_versions.source_path%type,
+    p_disk_image_name                 varchar2,
     p_seed_image_id                   vault_objects.object_id%type
   )
   return vault_objects.object_id%type;
 
   function create_virtual_disk
   (
-    p_user_id                         virtual_machines.user_id%type,
-    p_disk_image_name                 object_versions.source_path%type
+    p_disk_image_name                 varchar2
   )
   return vault_objects.object_id%type;
 
   function create_virtual_machine
   (
-    p_user_id                         virtual_machines.user_id%type,
     p_machine_name                    virtual_machines.machine_name%type,
     p_virtual_disk_id                 virtual_machines.virtual_disk_id%type,
     p_os_variant                      virtual_machines.os_variant%type,
@@ -67,6 +64,18 @@ as
     p_vm_id                           virtual_machines.vm_id%type
   );
 
+  function get_list_of_virtual_machines
+  (
+    p_json_parameters                 json_object_t
+  )
+  return clob;
+
+  function get_service_data
+  (
+    p_json_parameters                 json_object_t
+  )
+  return clob;
+
   procedure start_virtual_machine
   (
     p_vm_id                           virtual_machines.vm_id%type,
@@ -81,6 +90,13 @@ as
   procedure undefine_virtual_machine
   (
     p_vm_id                           virtual_machines.vm_id%type
+  );
+
+  procedure validate_session
+  (
+    p_json_parameters                 json_object_t,
+    p_required_authorization_level    middle_tier_map.required_authorization_level%type,
+    p_allow_blocked_session           middle_tier_map.allow_blocked_session%type
   );
 
 end vm_manager;
