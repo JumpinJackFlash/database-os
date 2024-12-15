@@ -4,6 +4,7 @@
 ### Recap of development... ###
 1. Had a big debate today with myself on whether to use JWT or not. Not...!!! We enforce session checking on every call to the DB. I left in the hooks for JWT Secret/Signing Key and JWT Expires In for optimistic middle-tier session checking if it's ever needed.
 2. Sorted out login/logout cycle.
+3. Added a table to the virtualMachines page to display data from getListOfVirtualMachines.
 
 ### Music on the playlist...  ###
 1. Neil Young - Neil Young
