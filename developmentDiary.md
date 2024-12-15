@@ -2,12 +2,14 @@
 
 ## December 13th, 2024 ##
 ### Recap of development... ###
-1. Had a big debate today with myself on whether to use JWT or not. Not...!!! We enforce session checking on every call to the DB. I left in the hooks for JWT Secret/Signing Key and JWT Expires In for optomistic middle-tier session checking if it's ever needed.
+1. Had a big debate today with myself on whether to use JWT or not. Not...!!! We enforce session checking on every call to the DB. I left in the hooks for JWT Secret/Signing Key and JWT Expires In for optimistic middle-tier session checking if it's ever needed.
+2. Sorted out login/logout cycle.
 
 ### Music on the playlist...  ###
 1. Neil Young - Neil Young
 2. David Bowie - Live at the SMO Civic '72
 3. Steely Dan - Pretzel Logic
+4. The Kinks - Sleepwalker
 
 ## December 13th, 2024 ##
 ### Recap of development... ###
