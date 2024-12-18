@@ -64,20 +64,13 @@ as
     p_vm_id                           virtual_machines.vm_id%type
   );
 
-  function get_list_of_virtual_machines
-  (
-    p_json_parameters                 json_object_t
-  )
-  return clob;
+  function get_list_of_virtual_machines return clob;
 
-  function get_service_data
-  (
-    p_json_parameters                 json_object_t
-  )
-  return clob;
+  function get_service_data return clob;
 
   procedure start_virtual_machine
   (
+    p_session_id                      varchar2,
     p_vm_id                           virtual_machines.vm_id%type,
     p_boot_device                     varchar2 default 'hd'
   );
@@ -90,13 +83,6 @@ as
   procedure undefine_virtual_machine
   (
     p_vm_id                           virtual_machines.vm_id%type
-  );
-
-  procedure validate_session
-  (
-    p_json_parameters                 json_object_t,
-    p_required_authorization_level    middle_tier_map.required_authorization_level%type,
-    p_allow_blocked_session           middle_tier_map.allow_blocked_session%type
   );
 
 end vm_manager;

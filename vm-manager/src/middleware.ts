@@ -24,6 +24,7 @@ export async function middleware(request: NextRequest)
   }
   console.log('Path: ' + request.nextUrl.pathname + ' - sessionId: ' + sessionId);
   if ('/' === request.nextUrl.pathname && null === request.headers.get('Authorization')) return NextResponse.redirect(new URL('/login', request.url));
+  if ('/virtualMachines' === request.nextUrl.pathname && null === sessionId)  return NextResponse.redirect(new URL('/login', request.url));
 }
 
 // Routes Middleware should not run on

@@ -4,6 +4,15 @@ grant execute on dbtwig.db_twig to asteriondb_dbos;
 create or replace synonym asteriondb_dbos.vault_objects for asteriondb_dgbunker.vault_objects;
 grant references(object_id), read on asteriondb_dgbunker.vault_objects to asteriondb_dbos;
 
+create or replace synonym asteriondb_dbos.dgbunker_service for asteriondb_dgbunker.dgbunker_service;
+grant execute on asteriondb_dgbunker.dgbunker_service to asteriondb_dbos;
+
+create or replace synonym asteriondb_dbos.dbplugin_api for asteriondb_dgbunker.dbplugin_api;
+grant execute on asteriondb_dgbunker.dbplugin_api to asteriondb_dbos;
+
+create or replace synonym asteriondb_dbos.icam for dbtwig_icam.icam;
+grant execute on dbtwig_icam.icam to asteriondb_dbos;
+
 create sequence id_seq minvalue 1 maxvalue 999999999999 cycle;
 
 create table virtual_machines

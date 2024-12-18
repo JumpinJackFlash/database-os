@@ -10,6 +10,7 @@ package body vm_manager as
 
   procedure start_virtual_machine_action
   (
+    p_session_id                      varchar2,
     p_vm_id                           virtual_machines.vm_id%type,
     p_virtual_disk_size               number default 0,
     p_sparse_disk_allocation          varchar2 default 'Y',
@@ -23,13 +24,11 @@ package body vm_manager as
     l_json_response                   json_object_t;
     l_virtual_machine                 virtual_machines%rowtype;
     l_json_parameters                 json_object_t := json_object_t;
-    l_virtual_disk_filename           varchar2(256) := 'null';
-    l_virtual_cdrom_filename          varchar2(256) := 'null';
     l_object_id                       vault_objects.object_id%type;
     l_object_created                  vault_objects.object_created%type;
 
   begin
-/*
+
     select  *
       into  l_virtual_machine
       from  virtual_machines
@@ -46,33 +45,42 @@ package body vm_manager as
 
     if l_virtual_machine.virtual_disk_id is not null then
 
-      l_virtual_disk_filename := digital_bunker.generate_object_filename(p_object_id => l_virtual_machine.virtual_disk_id,
-        p_gateway_name => s_plugin_process.get_string('pluginServer'), p_access_mode => dbobscura_api.READ_WRITE_ACCESS,
+      l_json_response := json_object_t(dgbunker_service.generate_object_filename(p_object_id => l_virtual_machine.virtual_disk_id,
+        p_gateway_name => s_plugin_process.get_string('pluginServer'), p_access_mode => dgbunker_service.READ_WRITE_ACCESS,
         p_linux_file_mode => 600, p_linux_subdir_mode => 705, p_disable_stream_write => 'Y',
-        p_access_limit => dbobscura_api.unlimited_access_operations, p_valid_until => restapi.NO_EXPIRATION,
-        p_file_user_group => 'root:root', p_subdir_user_group => 'root:root');
+        p_access_limit => dgbunker_service.unlimited_access_operations, p_valid_until => dgbunker_service.NO_EXPIRATION,
+        p_file_user_group => 'root:root', p_subdir_user_group => 'root:root', p_session_id => p_session_id));
+
+      l_json_parameters.put('vDiskFilename', l_json_response.get_string('filename'));
+      if 'N' = l_object_created then
+
+        l_json_parameters.put('vDiskSize', p_virtual_disk_size);
+        l_json_parameters.put('sparseDiskAllocation', p_sparse_disk_allocation);
+
+      end if;
+
+    else
+
+      l_json_parameters.put('vDiskFilename', 'null');
 
     end if;
 
     if l_virtual_machine.virtual_cdrom_id is not null then
 
-      l_virtual_cdrom_filename := digital_bunker.generate_object_filename(p_object_id => l_virtual_machine.virtual_cdrom_id,
-        p_access_limit => dbobscura_api.unlimited_access_operations,
-        p_valid_until => restapi.NO_EXPIRATION, p_access_mode => dbobscura_api.READ_ONLY_ACCESS,
+      l_json_response := json_object_t(dgbunker_service.generate_object_filename(p_object_id => l_virtual_machine.virtual_cdrom_id,
+        p_access_limit => dgbunker_service.UNLIMITED_ACCESS_OPERATIONS,
+        p_valid_until => dgbunker_service.NO_EXPIRATION, p_access_mode => dgbunker_service.READ_ACCESS,
         p_linux_file_mode => 701, p_linux_subdir_mode => 705, p_file_user_group => 'qemu:qemu', p_subdir_user_group => 'root:root',
-        p_gateway_name => s_plugin_process.get_string('pluginServer'));
+        p_gateway_name => s_plugin_process.get_string('pluginServer'), p_session_id => p_session_id));
+
+      l_json_parameters.put('vCdromFilename', l_json_response.get_string('filename'));
+
+    else
+
+      l_json_parameters.put('vCdromFilename', 'null');
 
     end if;
 
-    l_json_parameters.put('vDiskFilename', l_virtual_disk_filename);
-    if 'N' = l_object_created then
-
-      l_json_parameters.put('vDiskSize', p_virtual_disk_size);
-      l_json_parameters.put('sparseDiskAllocation', p_sparse_disk_allocation);
-
-    end if;
-
-    l_json_parameters.put('vCdromFilename', l_virtual_cdrom_filename);
     l_json_parameters.put('vCpus', l_virtual_machine.vcpu_count);
     l_json_parameters.put('vMemory', l_virtual_machine.virtual_memory);
     l_json_parameters.put('osVariant', l_virtual_machine.os_variant);
@@ -91,8 +99,7 @@ package body vm_manager as
          set  virtual_cdrom_id = null
        where  vm_id = p_vm_id;
 
-    end if; */
-    null;
+    end if;
 
   end start_virtual_machine_action;
 
@@ -452,11 +459,7 @@ package body vm_manager as
 
   end delete_virtual_machine;
 
-  function get_list_of_virtual_machines
-  (
-    p_json_parameters                 json_object_t
-  )
-  return clob
+  function get_list_of_virtual_machines return clob
 
   is
 
@@ -490,11 +493,7 @@ package body vm_manager as
 
   end get_list_of_virtual_machines;
 
-  function get_service_data
-  (
-    p_json_parameters                 json_object_t
-  )
-  return clob
+  function get_service_data return clob
 
   is
 
@@ -510,6 +509,7 @@ package body vm_manager as
 
   procedure start_virtual_machine
   (
+    p_session_id                      varchar2,
     p_vm_id                           virtual_machines.vm_id%type,
     p_boot_device                     varchar2 default 'hd'
   )
@@ -518,9 +518,34 @@ package body vm_manager as
 
   begin
 
-    start_virtual_machine_action(p_vm_id => p_vm_id, p_boot_device => p_boot_device);
+    start_virtual_machine_action(p_session_id => p_session_id, p_vm_id => p_vm_id, p_boot_device => p_boot_device);
 
   end start_virtual_machine;
+
+  procedure stop_virtual_machine
+  (
+    p_vm_id                           virtual_machines.vm_id%type
+  )
+
+  is
+
+    l_virtual_machine                 virtual_machines%rowtype;
+    l_json_parameters                 json_object_t := json_object_t;
+    l_json_response                   json_object_t;
+
+  begin
+
+    select  *
+      into  l_virtual_machine
+      from  virtual_machines
+     where  vm_id = p_vm_id;
+
+    s_plugin_process := dbplugin_api.connect_to_plugin_server(PLUGIN_MODULE);                    -- Connect to the dbplugin_api.
+    l_json_parameters.put('machineName', l_virtual_machine.machine_name);
+    l_json_response := dbplugin_api.call_plugin(s_plugin_process, 'stopVirtualMachine', l_json_parameters);
+    dbplugin_api.disconnect_from_plugin_server(s_plugin_process);                 -- Disconnect from the plugin.
+
+  end stop_virtual_machine;
 
   procedure undefine_virtual_machine
   (
@@ -549,49 +574,6 @@ package body vm_manager as
     null;
 
   end undefine_virtual_machine;
-
-  procedure stop_virtual_machine
-  (
-    p_vm_id                           virtual_machines.vm_id%type
-  )
-
-  is
-
-    l_virtual_machine                 virtual_machines%rowtype;
-    l_json_parameters                 json_object_t := json_object_t;
-    l_json_response                   json_object_t;
-
-  begin
-/*
-    select  *
-      into  l_virtual_machine
-      from  virtual_machines
-     where  vm_id = p_vm_id;
-
-    s_plugin_process := dbplugin_api.connect_to_plugin_server(PLUGIN_MODULE);                    -- Connect to the dbplugin_api.
-    l_json_parameters.put('machineName', l_virtual_machine.machine_name);
-    l_json_response := dbplugin_api.call_plugin(s_plugin_process, 'stopVirtualMachine', l_json_parameters);
-    dbplugin_api.disconnect_from_plugin_server(s_plugin_process);                 -- Disconnect from the plugin.
-*/
-
-    null;
-
-  end stop_virtual_machine;
-
-  procedure validate_session
-  (
-    p_json_parameters                 json_object_t,
-    p_required_authorization_level    middle_tier_map.required_authorization_level%type,
-    p_allow_blocked_session           middle_tier_map.allow_blocked_session%type
-  )
-
-  is
-
-  begin
-
-    null;
-
-  end validate_session;
 
 end vm_manager;
 /

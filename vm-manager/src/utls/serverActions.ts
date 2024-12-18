@@ -87,6 +87,20 @@ export async function getServiceData()
   return response;
 }
 
+export async function startVirtualMachine(vmId: number)
+{
+  let bodyData = { vmId: vmId };
+  let response = await callDbTwig('dbos/startVirtualMachine', bodyData);
+  return response;
+}
+
+export async function stopVirtualMachine(vmId: number)
+{
+  let bodyData = { vmId: vmId };
+  let response = await callDbTwig('dbos/stopVirtualMachine', bodyData);
+  return response;
+}
+
 export async function terminateUserSession()
 {
   const response = await callDbTwig('icam/terminateUserSession');
