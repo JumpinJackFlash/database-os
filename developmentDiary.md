@@ -1,6 +1,17 @@
 # A diary of development activities... #
 
-## December 13th, 2024 ##
+## December 17th, 2024 ##
+### Recap of development... ###
+1. After a few days of work to setup the new AsterionDB/DbTwig data-layer micro-service architecture, I'm back at work on this project. We're now able to make complete data-layer calls in between services in DbTwig w/ proper parameter signatures etc. etc.
+2. Added buttons to start and stop the VM's.
+3. Got the start/stop logic in the vm_manager package working (again).
+4. Started and stopped my first VM from the web interface..!!!
+
+### Music on the playlist...  ###
+1. Grateful Dead - Live Dead
+2. Jackson Browne - Running on Empty
+
+## December 14th, 2024 ##
 ### Recap of development... ###
 1. Had a big debate today with myself on whether to use JWT or not. Not...!!! We enforce session checking on every call to the DB. I left in the hooks for JWT Secret/Signing Key and JWT Expires In for optimistic middle-tier session checking if it's ever needed.
 2. Sorted out login/logout cycle.
