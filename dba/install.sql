@@ -1,17 +1,69 @@
-create or replace synonym asteriondb_dbos.db_twig for dbtwig.db_twig;
-grant execute on dbtwig.db_twig to asteriondb_dbos;
+rem  Copyright (c) 2020 By AsterionDB Inc.
+rem
+rem  install.sql 	AsterionDB DBOS
+rem
+rem  Written By:  Steve Guilford
+rem
+rem  This SQL script drives the creation of all required objects for the AsterionDB DBOS.
+rem
+rem  Invocation: sqlplus /nolog @install $DBA_USER $DATABASE_NAME $DBTWIG_USER $DGBUNKER_USER $DBOS_USER
 
-create or replace synonym asteriondb_dbos.vault_objects for asteriondb_dgbunker.vault_objects;
-grant references(object_id), read on asteriondb_dgbunker.vault_objects to asteriondb_dbos;
+whenever sqlerror exit failure;
 
-create or replace synonym asteriondb_dbos.dgbunker_service for asteriondb_dgbunker.dgbunker_service;
-grant execute on asteriondb_dgbunker.dgbunker_service to asteriondb_dbos;
+set verify off
+spool install.log
 
-create or replace synonym asteriondb_dbos.dbplugin_api for asteriondb_dgbunker.dbplugin_api;
-grant execute on asteriondb_dgbunker.dbplugin_api to asteriondb_dbos;
+define dba_user = '&1'
+define database_name = '&2'
+define dbtwig_user = '&3'
+define dbgunker_user = '&4'
+define dbos_user = '&5'
 
-create or replace synonym asteriondb_dbos.icam for dbtwig_icam.icam;
-grant execute on dbtwig_icam.icam to asteriondb_dbos;
+connect &dba_user@"&database_name";
+
+set termout off
+set echo on
+
+whenever sqlerror continue
+
+declare
+
+    l_sql_text                        clob;
+    l_default_tablespace              database_properties.property_value%type;
+
+begin
+
+    select  property_value
+      into  l_default_tablespace
+      from  database_properties 
+     where  property_name = 'DEFAULT_PERMANENT_TABLESPACE';
+
+    l_sql_text := 'create user &dbos_user';
+    execute immediate l_sql_text;
+
+    l_sql_text := 'alter user &dbos_user quota 50M on '||l_default_tablespace;
+    execute immediate l_sql_text;
+
+end;
+.
+/
+
+create or replace synonym &dbos_user.db_twig for &dbtwig_user.db_twig;
+grant execute on dbtwig.db_twig to &dbos_user;
+
+create or replace synonym &dbos_user.vault_objects for &dgbunker_user.vault_objects;
+grant references(object_id), read on &dgbunker_user.vault_objects to &dbos_user;
+
+create or replace synonym &dbos_user.dgbunker_service for &dgbunker_user.dgbunker_service;
+grant execute on &dgbunker_user.dgbunker_service to &dbos_user;
+
+create or replace synonym &dbos_user.dbplugin_api for &dgbunker_user.dbplugin_api;
+grant execute on &dgbunker_user.dbplugin_api to &dbos_user;
+
+create or replace synonym &dbos_user.icam for dbtwig_icam.icam;
+grant execute on dbtwig_icam.icam to &dbos_user;
+
+alter session set current_schema = &dbos_user;
 
 create sequence id_seq minvalue 1 maxvalue 999999999999 cycle;
 
@@ -36,8 +88,8 @@ create table virtual_machines
 
 @$HOME/asterion/oracle/dbTwig/dba/middleTierMap.sql
 
-grant execute on &4..restapi to &3;
-grant select on &4..middle_tier_map to &3;
+grant execute on &dbos_user.restapi to &dbtwig_user;
+grant select on &dbos_user.middle_tier_map to &dbtwig_user;
 
 begin vm_manager.create_dbos_service; end;
 .

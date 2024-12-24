@@ -559,7 +559,7 @@ package body vm_manager as
     l_json_response                   json_object_t;
 
   begin
-/*
+
     select  *
       into  l_virtual_machine
       from  virtual_machines
@@ -569,9 +569,6 @@ package body vm_manager as
     l_json_parameters.put('machineName', l_virtual_machine.machine_name);
     l_json_response := dbplugin_api.call_plugin(s_plugin_process, 'undefineVirtualMachine', l_json_parameters);
     dbplugin_api.disconnect_from_plugin_server(s_plugin_process);                 -- Disconnect from the plugin.
-*/
-
-    null;
 
   end undefine_virtual_machine;
 

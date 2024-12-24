@@ -1,12 +1,15 @@
 "use server"
 
 import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
 
 const cookieName = 'sessionData';
 
 async function callDbTwig(apiCall: string, body?: any) 
 {
-  var cookieData = (await cookies()).get(cookieName);
+  const cookieStore = await cookies();
+
+  var cookieData = cookieStore.get(cookieName);
   var bearerToken = null;
   if (undefined !== cookieData && '' !== cookieData.value)
   {
@@ -40,13 +43,8 @@ async function callDbTwig(apiCall: string, body?: any)
     httpStatus: httpResponse.status
   }
 
-  if (!response.ok)
-  {
-    if ([401, 403].includes(response.httpStatus))
-    {
-      console.log('log user out....');
-    }       
-  }
+  if (!response.ok && 403 === response.httpStatus) cookieStore.delete(cookieName);
+    
   return response;
 }
 
@@ -56,7 +54,6 @@ export async function createUserSession(identification: string, password: string
   let response = await callDbTwig('icam/createUserSession', bodyData);
   if (response.ok)
   {
-    console.log(response.jsonData);
     const cookieStore = await cookies()
     
     cookieStore.set(cookieName, 
@@ -98,6 +95,13 @@ export async function stopVirtualMachine(vmId: number)
 {
   let bodyData = { vmId: vmId };
   let response = await callDbTwig('dbos/stopVirtualMachine', bodyData);
+  return response;
+}
+
+export async function undefineVirtualMachine(vmId: number)
+{
+  let bodyData = { vmId: vmId };
+  let response = await callDbTwig('dbos/undefineVirtualMachine', bodyData);
   return response;
 }
 

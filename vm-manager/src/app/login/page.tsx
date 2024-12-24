@@ -1,6 +1,5 @@
 'use client'
 
-import {NextUIProvider} from "@nextui-org/system";
 import { useState } from "react";
 import { Button, Input } from "@nextui-org/react";
 import { Form } from "@nextui-org/form";
@@ -30,7 +29,7 @@ export default function LoginPage(props: any)
   };
 
   return(
-    <NextUIProvider>
+    <>
       <div className="flex h-full w-full items-center justify-center">
         <div className="flex w-full max-w-sm flex-col gap-4 rounded-large px-8 pb-10 pt-6">
           {serviceTitle}
@@ -80,6 +79,6 @@ export default function LoginPage(props: any)
           </Form>
         </div>
       </div>    
-    </NextUIProvider>
+    </>
   );
 }
