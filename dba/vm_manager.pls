@@ -574,4 +574,4 @@ package body vm_manager as
 
 end vm_manager;
 /
-show errors package body oci_interface
+show errors package body vm_manager

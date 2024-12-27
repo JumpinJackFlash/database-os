@@ -16,12 +16,13 @@ spool install.log
 define dba_user = '&1'
 define database_name = '&2'
 define dbtwig_user = '&3'
-define dbgunker_user = '&4'
-define dbos_user = '&5'
+define icam_user = '&4'
+define dgbunker_user = '&5'
+define dbos_user = '&6'
 
 connect &dba_user@"&database_name";
 
-set termout off
+set termout on
 set echo on
 
 whenever sqlerror continue
@@ -48,20 +49,25 @@ end;
 .
 /
 
-create or replace synonym &dbos_user.db_twig for &dbtwig_user.db_twig;
-grant execute on dbtwig.db_twig to &dbos_user;
+set verify on
 
-create or replace synonym &dbos_user.vault_objects for &dgbunker_user.vault_objects;
-grant references(object_id), read on &dgbunker_user.vault_objects to &dbos_user;
+create or replace synonym &dbos_user..db_twig for &dbtwig_user..db_twig;
+grant execute on &dbtwig_user..db_twig to &dbos_user;
 
-create or replace synonym &dbos_user.dgbunker_service for &dgbunker_user.dgbunker_service;
-grant execute on &dgbunker_user.dgbunker_service to &dbos_user;
+create or replace synonym &dbos_user..vault_objects for &dgbunker_user..vault_objects;
+grant references(object_id), read on &dgbunker_user..vault_objects to &dbos_user;
 
-create or replace synonym &dbos_user.dbplugin_api for &dgbunker_user.dbplugin_api;
-grant execute on &dgbunker_user.dbplugin_api to &dbos_user;
+create or replace synonym &dbos_user..dgbunker_service for &dgbunker_user..dgbunker_service;
+grant execute on &dgbunker_user..dgbunker_service to &dbos_user;
 
-create or replace synonym &dbos_user.icam for dbtwig_icam.icam;
-grant execute on dbtwig_icam.icam to &dbos_user;
+create or replace synonym &dbos_user..dbplugin_api for &dgbunker_user..dbplugin_api;
+grant execute on &dgbunker_user..dbplugin_api to &dbos_user;
+
+create or replace synonym &dbos_user..icam for &icam_user..icam;
+grant execute on &icam_user..icam to &dbos_user;
+
+create or replace synonym &dbos_user..icam_users for &icam_user..icam_users;
+grant references(user_id), read on &icam_user..icam_users to &dbos_user;
 
 alter session set current_schema = &dbos_user;
 
@@ -71,7 +77,7 @@ create table virtual_machines
 (
   vm_id                             number(12) primary key,
   user_id                           number(12) not null
-    references object_vault_users(user_id),
+    references icam_users(user_id),
   creation_timestamp                timestamp default systimestamp at time zone 'utc' not null,
   machine_name                      varchar2(30) unique not null,
   virtual_disk_id                   varchar2(32)
@@ -87,13 +93,18 @@ create table virtual_machines
 );
 
 @$HOME/asterion/oracle/dbTwig/dba/middleTierMap.sql
+@$HOME/asterion/oracle/database-os/dba/dbTwigData.sql
 
-grant execute on &dbos_user.restapi to &dbtwig_user;
-grant select on &dbos_user.middle_tier_map to &dbtwig_user;
+@$HOME/asterion/oracle/database-os/dba/loadPackages.sql
+
+grant execute on &dbos_user..restapi to &dbtwig_user;
+grant select on &dbos_user..middle_tier_map to &dbtwig_user;
 
 begin vm_manager.create_dbos_service; end;
 .
 /
 
 commit;
+exit;
+
 

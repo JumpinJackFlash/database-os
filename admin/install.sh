@@ -23,6 +23,9 @@ read -p "Database name [$TWO_TASK]: " DB_NAME
 read -p "Enter the name of the database user that owns the DbTwig schema [dbtwig]: " DBTWIG_USER
 [ "${DBTWIG_USER}" == '' ] && DBTWIG_USER="dbtwig"
 
+read -p "Enter the name of the database user that owns the ICAM schema [dbtwig]: " DBTWIG_ICAM
+[ "${ICAM_USER}" == '' ] && ICAM_USER="dbtwig_icam"
+
 read -p "Enter the name of the database user that owns the AsterionDB schema [asteriondb_dgbunker]: " DGBUNKER_USER
 [ "${DGBUNKER_USER}" == '' ] && DGBUNKER_USER="asteriondb_dgbunker"
 
@@ -32,5 +35,5 @@ read -p "Enter the name of the database user that owns the AsterionDB DBOS schem
 cd ../dba
 
 set +e
-sqlplus /nolog @install $DBA_USER $DB_NAME $DBTWIG_USER $DGBUNKER_USER $DBOS_USER
+sqlplus /nolog @install $DBA_USER $DB_NAME $DBTWIG_USER $ICAM_USER $DGBUNKER_USER $DBOS_USER
 
