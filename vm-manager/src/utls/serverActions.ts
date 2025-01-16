@@ -67,12 +67,6 @@ export async function createUserSession(identification: string, password: string
   return response;
 }
 
-export async function getListOfVirtualMachines()
-{
-  const response = await callDbTwig('dbos/getListOfVirtualMachines')
-  return response;
-}
-
 export async function getServiceData()
 {
   const response = await callDbTwig('dbos/getServiceData');
@@ -81,6 +75,19 @@ export async function getServiceData()
     process.env.JWT_SIGNING_KEY = response.jsonData.jwtSigningKey;
     process.env.JWT_EXPIRES_IN = response.jsonData.jwtExpiresIn;
   }
+  return response;
+}
+
+export async function getVirtualMachines()
+{
+  const response = await callDbTwig('dbos/getVirtualMachines')
+  return response;
+}
+
+export async function getVMSeedImages(objectType: string)
+{
+  let body = { objectType }
+  const response = await callDbTwig('dbos/getVMSeedImages', body);
   return response;
 }
 

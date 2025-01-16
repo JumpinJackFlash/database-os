@@ -1,15 +1,17 @@
 'use client'
 
-import { getListOfVirtualMachines, startVirtualMachine, stopVirtualMachine, terminateUserSession, undefineVirtualMachine } from "@/utls/serverActions";
-import { Button } from "@nextui-org/react";
+import { getVMSeedImages, getVirtualMachines, startVirtualMachine, stopVirtualMachine, terminateUserSession, undefineVirtualMachine } from "@/utls/serverActions";
+import { Button, Divider } from "@nextui-org/react";
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 import { Table,  TableHeader,  TableBody,  TableColumn,  TableRow,  TableCell, getKeyValue } from "@nextui-org/table";
-import { checkApiResponse } from "@/utls/clientUtils";
+import {Select, SelectSection, SelectItem} from "@nextui-org/select";
 
 export default function VirtualMachinesPage(props: any) 
 {
   const [ virtualMachines, setVirtualMachines ] = useState([ { vmId: 1, machineName: '', osVariant: ''}]);
+  const [ isoSeedImages, setIsoSeedImages ] = useState([ { objectId: 1, objectName: '', fileExtension: '', creationDate: '' } ]);
+  const [ qcow2SeedImages, setQcow2SeedImages ] = useState([ { objectId: 1, objectName: '', fileExtension: '', creationDate: '' } ]);
 
   const vmColumns =
   [
@@ -33,11 +35,25 @@ export default function VirtualMachinesPage(props: any)
 
   useEffect(() =>
   {
-    getListOfVirtualMachines().then((response) =>
+    getVirtualMachines().then((response) =>
     {
       if (!response.ok && 403 === response.httpStatus) router.push('/login');
       if (response.ok) setVirtualMachines(response.jsonData.virtualMachines);
     });
+
+    getVMSeedImages('iso').then((response) =>
+    {
+      if (!response.ok && 403 === response.httpStatus) router.push('/login');
+      console.log(response);
+      setIsoSeedImages(response.jsonData.vaultObjects);
+    });
+
+    getVMSeedImages('qcow2').then((response) =>
+    {
+      if (!response.ok && 403 === response.httpStatus) router.push('/login');
+      setQcow2SeedImages(response.jsonData.vaultObjects);
+    });
+      
   }, []);
 
   function startVirtualMachineHandler(vmId: number)
@@ -84,7 +100,8 @@ export default function VirtualMachinesPage(props: any)
 
   return (
     <>
-      <div>
+      <div className="container max-w-screen-md p-4">
+        <p>Virtual Machines...</p>
         <Table aria-label="List of Virtual Machines">
           <TableHeader columns={vmColumns}>{(column) => <TableColumn key={column.key}>{column.label}</TableColumn>}</TableHeader>
           <TableBody items={virtualMachines}>        
@@ -97,8 +114,33 @@ export default function VirtualMachinesPage(props: any)
           </TableBody>
         </Table>
       </div>
-      <div>
-        <Button className="w-full" color="primary" type="button" onClick={logout}>Log Out...</Button>
+      <Divider className="m-4 max-w-screen-md" />
+      <div className="container max-w-screen-md p-4">
+        <p>Create an ISO based VM Image...</p>
+        <div className="flex w-full flex-wrap md:flex-nowrap gap-4">
+          <Select className="max-w-xs" label="Select a seed image">
+            {isoSeedImages.map((isoSeedImage) => 
+            (
+              <SelectItem key={isoSeedImage.objectId}>{isoSeedImage.objectName + ' - ' + isoSeedImage.fileExtension}</SelectItem>
+            ))}
+          </Select>
+        </div>
+      </div>
+      <Divider className="m-4 max-w-screen-md" />
+      <div className="container max-w-screen-md p-4">
+        <p>Create a Cloud-Init based VM Image...</p>
+        <div className="flex w-full flex-wrap md:flex-nowrap gap-4">
+          <Select className="max-w-xs" label="Select a seed image">
+            {qcow2SeedImages.map((qcow2SeedImage) => 
+            (
+              <SelectItem key={qcow2SeedImage.objectId}>{qcow2SeedImage.objectName + ' - ' + qcow2SeedImage.fileExtension}</SelectItem>
+            ))}
+          </Select>
+        </div>
+      </div>
+      <Divider className="m-4 max-w-screen-md" />
+      <div className="p-4" >
+        <Button color="primary" type="button" onClick={logout}>Log Out...</Button>
       </div>
     </>
   );
