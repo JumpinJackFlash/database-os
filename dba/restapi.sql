@@ -1,13 +1,19 @@
 create or replace
 package restapi as
 
-  function get_list_of_virtual_machines
+  function get_service_data
   (
     p_json_parameters                 json_object_t
   )
   return clob;
 
-  function get_service_data
+  function get_virtual_machines
+  (
+    p_json_parameters                 json_object_t
+  )
+  return clob;
+
+  function get_vm_seed_images
   (
     p_json_parameters                 json_object_t
   )

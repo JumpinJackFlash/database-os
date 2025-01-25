@@ -6,6 +6,13 @@ package body vm_manager as
   SERVICE_NAME                        constant varchar2(4) := 'dbos';
   SERVICE_TITLE                       constant varchar2(27) := 'AsterionDB - Database O/S';
 
+  VM_COMPONENTS_KG                    constant varchar2(26) := 'Virtual Machine Components';
+  CONTENTS_KW                         constant varchar2(8) := 'Contents';
+  VM_SEED_IMAGE                       constant varchar2(13) := 'VM Seed Image';
+
+  ISO_IMAGES                          constant varchar2(10) := 'ISO Images';
+  QCOW2_IMAGES                        constant varchar2(9) := 'VM Images';
+
   s_plugin_process                    json_object_t;
 
   procedure start_virtual_machine_action
@@ -302,16 +309,16 @@ package body vm_manager as
 
   function create_virtual_disk
   (
+    p_session_id                      varchar2,
     p_disk_image_name                 varchar2,
     p_seed_image_id                   vault_objects.object_id%type
   )
-  return vault_objects.object_id%type
+  return clob
 
   is
 
     l_dest_object_id                  vault_objects.object_id%type;
-
---    l_source_data_type                object_types.data_type%type;
+    l_source_data_type                varchar2(5);
 
     l_source_clob                     clob;
     l_source_blob                     blob;
@@ -320,8 +327,8 @@ package body vm_manager as
     l_dest_blob                       blob;
 
   begin
-/*
-    select  data_type
+
+/*    select  data_type
       into  l_source_data_type
       from  object_types t, file_extensions e, vault_objects o
      where  o.object_id = p_seed_image_id
@@ -362,19 +369,17 @@ package body vm_manager as
 
   function create_virtual_disk
   (
+    p_session_id                      varchar2,
     p_disk_image_name                 varchar2
   )
-  return vault_objects.object_id%type
+  return clob
 
   is
 
   begin
-/*
-    return digital_bunker.create_an_object(p_user_id => p_user_id, p_source_path => p_disk_image_name,
-      p_client_address => sys_context('userenv', 'ip_address'), p_program_name => 'vm_manager',
-      p_modification_date => null);
-*/
-    return null;
+
+    return dgbunker_service.create_an_object(p_session_id => p_session_id, p_source_path => p_disk_image_name,
+      p_client_address => sys_context('userenv', 'ip_address'), p_program_name => 'vm_manager.create_virtual_disk');
 
   end create_virtual_disk;
 
@@ -459,7 +464,22 @@ package body vm_manager as
 
   end delete_virtual_machine;
 
-  function get_list_of_virtual_machines return clob
+
+  function get_service_data return clob
+
+  is
+
+    l_service_data                    json_object_t := json_object_t(db_twig.get_service_data(SERVICE_NAME));
+
+  begin
+
+    l_service_data.put('serviceTitle', SERVICE_TITLE);
+    l_service_data.put('serviceName', SERVICE_NAME);
+    return l_service_data.to_clob;
+
+  end get_service_data;
+
+  function get_virtual_machines return clob
 
   is
 
@@ -491,21 +511,82 @@ package body vm_manager as
 
       return l_result;
 
-  end get_list_of_virtual_machines;
+  end get_virtual_machines;
 
-  function get_service_data return clob
+  function get_vm_seed_images
+  (
+    p_session_id                      varchar2,
+    p_object_type                     varchar2
+  )
+  return clob
 
   is
 
-    l_service_data                    json_object_t := json_object_t(db_twig.get_service_data(SERVICE_NAME));
+    l_keyword_and_value               json_object_t := json_object_t;
+    l_keywords_and_values             json_array_t := json_array_t;
+    l_json_object                     json_object_t;
+    l_column_to_return                json_object_t := json_object_t;
+    l_columns_to_return               json_array_t := json_array_t;
+    l_object_type_id                  number(12);
+    l_object_type_ids                 json_array_t := json_array_t;
 
   begin
 
-    l_service_data.put('serviceTitle', SERVICE_TITLE);
-    l_service_data.put('serviceName', SERVICE_NAME);
-    return l_service_data.to_clob;
+    if upper(p_object_type) not in ('ISO', 'QCOW2') then
 
-  end get_service_data;
+      raise_application_error(-20000, 'Invalid VM Seed Image type specified: '||p_object_type);
+
+    end if;
+
+    if upper(p_object_type) = 'ISO' then
+
+      l_json_object := json_object_t(dgbunker_service.get_object_type_id(ISO_IMAGES));
+
+    else
+
+      l_json_object := json_object_t(dgbunker_service.get_object_type_id(QCOW2_IMAGES));
+
+    end if;
+
+--  We're looking for these types of objects...
+
+    l_object_type_id := l_json_object.get_number('objectTypeId');
+    l_object_type_ids.append(l_object_type_id);
+
+--  We don't need every column...
+
+    l_column_to_return.put('columnName', 'objectId');
+    l_column_to_return.put('column', 'object_id');
+    l_columns_to_return.append(l_column_to_return);
+
+    l_column_to_return.put('columnName', 'objectName');
+    l_column_to_return.put('column', 'object_name');
+    l_columns_to_return.append(l_column_to_return);
+
+    l_column_to_return.put('columnName', 'fileExtension');
+    l_column_to_return.put('column', 'file_extension');
+    l_columns_to_return.append(l_column_to_return);
+
+    l_column_to_return.put('columnName', 'creationDate');
+    l_column_to_return.put('column', 'creation_date');
+    l_columns_to_return.append(l_column_to_return);
+
+--  We're gonna be getting a bunch of objects that have been cataloged.
+--  Specify our keyword group...
+
+    l_keyword_and_value.put('keywordGroup', VM_COMPONENTS_KG);
+
+--  Let's get all of our VM Seed Images
+
+    l_keyword_and_value.put('keyword', CONTENTS_KW);
+    l_keyword_and_value.put('keywordValue', VM_SEED_IMAGE);
+    l_keywords_and_values.append(l_keyword_and_value);
+
+    return dgbunker_service.get_vault_objects(p_session_id => p_session_id, p_view_type => dgbunker_service.OVT_CATALOGED,
+      p_selected_keywords_and_values => l_keywords_and_values, p_object_type_ids => l_object_type_ids,
+      p_columns_to_return => l_columns_to_return);
+
+  end get_vm_seed_images;
 
   procedure start_virtual_machine
   (

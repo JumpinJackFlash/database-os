@@ -31,16 +31,18 @@ as
 
   function create_virtual_disk
   (
+    p_session_id                      varchar2,
     p_disk_image_name                 varchar2,
     p_seed_image_id                   vault_objects.object_id%type
   )
-  return vault_objects.object_id%type;
+  return clob;
 
   function create_virtual_disk
   (
+    p_session_id                      varchar2,
     p_disk_image_name                 varchar2
   )
-  return vault_objects.object_id%type;
+  return clob;
 
   function create_virtual_machine
   (
@@ -64,9 +66,16 @@ as
     p_vm_id                           virtual_machines.vm_id%type
   );
 
-  function get_list_of_virtual_machines return clob;
-
   function get_service_data return clob;
+
+  function get_virtual_machines return clob;
+
+  function get_vm_seed_images
+  (
+    p_session_id                      varchar2,
+    p_object_type                     varchar2
+  )
+  return clob;
 
   procedure start_virtual_machine
   (
