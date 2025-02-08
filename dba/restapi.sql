@@ -1,6 +1,23 @@
 create or replace
 package restapi as
 
+  procedure create_vm_from_iso_image
+  (
+    p_json_parameters                 json_object_t
+  );
+
+  function get_iso_images
+  (
+    p_json_parameters                 json_object_t
+  )
+  return clob;
+
+  function get_os_variants
+  (
+    p_json_parameters                 json_object_t
+  )
+  return clob;
+
   function get_service_data
   (
     p_json_parameters                 json_object_t
@@ -8,12 +25,6 @@ package restapi as
   return clob;
 
   function get_virtual_machines
-  (
-    p_json_parameters                 json_object_t
-  )
-  return clob;
-
-  function get_vm_seed_images
   (
     p_json_parameters                 json_object_t
   )

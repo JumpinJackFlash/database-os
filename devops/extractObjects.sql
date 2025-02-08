@@ -12,6 +12,6 @@ set echo on
 @extractPackageHeader restapi &git_home/database-os/dba
 @preWrapPackageBody restapi &git_home/database-os/dba
 
-@&git_home/dbTwig/dba/extractDbTwigData &git_home/database-os/dba/dbTwigData.sql database_os
+@&git_home/dbTwig/dba/extractDbTwigData &git_home/database-os/dba/dbTwigData.sql dbos
 
 exit;

@@ -54,28 +54,43 @@ as
     p_virtual_cdrom_id                virtual_machines.virtual_cdrom_id%type default null,
     p_vcpu_count                      virtual_machines.vcpu_count%type default 1,
     p_virtual_memory                  virtual_machines.virtual_memory%type default 1024,
-    p_network_source                  virtual_machines.network_source%type default 'network',
+    p_bridged_connection              varchar2 default 'N',
     p_network_device                  virtual_machines.network_device%type default 'default',
     p_remove_cdrom_after_first_boot   varchar2 default 'Y',
     p_boot_device                     varchar2 default 'hd'
   )
   return virtual_machines.vm_id%type;
 
+  procedure create_vm_from_iso_image
+  (
+    p_session_id                      varchar2,
+    p_machine_name                    virtual_machines.machine_name%type,
+    p_iso_image_id                    virtual_machines.virtual_disk_id%type,
+    p_os_variant_id                   pls_integer,
+    p_virtual_disk_size               number default 0,
+    p_sparse_disk_allocation          varchar2 default 'Y',
+    p_vcpu_count                      virtual_machines.vcpu_count%type default 1,
+    p_virtual_memory                  virtual_machines.virtual_memory%type default 1024,
+    p_bridged_connection              varchar2 default 'N',
+    p_network_device                  virtual_machines.network_device%type default 'default'
+  );
+
   procedure delete_virtual_machine
   (
     p_vm_id                           virtual_machines.vm_id%type
   );
 
+  function get_iso_images
+  (
+    p_session_id                      varchar2
+  )
+  return clob;
+
+  function get_os_variants return clob;
+
   function get_service_data return clob;
 
   function get_virtual_machines return clob;
-
-  function get_vm_seed_images
-  (
-    p_session_id                      varchar2,
-    p_object_type                     varchar2
-  )
-  return clob;
 
   procedure start_virtual_machine
   (

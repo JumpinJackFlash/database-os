@@ -92,6 +92,13 @@ create table virtual_machines
   assigned_to_host                  varchar2(256)
 );
 
+create table os_variants
+(
+  variant_id                        number(7) primary key,
+  variant                           varchar2(30) unique not null,
+  long_name                         varchar2(64) not null
+);
+
 @$HOME/asterion/oracle/dbTwig/dba/middleTierMap.sql
 @$HOME/asterion/oracle/database-os/dba/dbTwigData.sql
 

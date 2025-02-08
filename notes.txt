@@ -94,9 +94,7 @@ begin vm_manager.start_virtual_machine(1031); end;
 begin vm_manager.undefine_virtual_machine(1031); end;
 begin vm_manager.stop_virtual_machine(1031); end;
 
-alter table virtual_machines drop column first_boot;
-    check (boot_device in ('disk', 'cdrom'));
-
+-------------------
 
 declare
 
@@ -121,28 +119,7 @@ begin
   
 end;
 
-declare
-
-  l_virtual_disk_id             virtual_machines.virtual_disk_id%type;
-  
-begin
-
-  l_virtual_disk_id := vm_manager.create_virtual_disk(p_user_id => 172, p_disk_image_name => 'hunter-test-2.qcow2');
-  dbms_output.put_line(l_virtual_disk_id);
-  
-end;
-
-declare
-
-  l_vm_id                         virtual_machines.vm_id%type;
-  
-begin
-    
-  l_vm_id := vm_manager.create_virtual_machine(p_user_id => 172, p_machine_name => 'alpine-virt-3.20.1-x86_64', p_virtual_disk_id => 'IQ6SKTMLO4EI01WRYFKG7GWMXA6GYKWS', p_virtual_disk_size => 5, p_virtual_cdrom_id => 'I7UEIWK07IWWLPVWMJK53GBIZKGO33X2',
-    p_os_variant => 'alpinelinux3.19', p_boot_device => 'cdrom');
-  dbms_output.put_line(l_vm_id);
-  
-end;
+-------------------------------
 
 declare
 
@@ -187,6 +164,8 @@ begin
   dbms_output.put_line(l_vm_id);
   
 end;
+
+------------------------
 
 
 declare

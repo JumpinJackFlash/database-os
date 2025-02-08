@@ -48,6 +48,17 @@ async function callDbTwig(apiCall: string, body?: any)
   return response;
 }
 
+export async function createVmFromIsoImage(machineName: string, isoImageId: string, osVariantId: number,
+  virtualDiskSize: number, sparseDiskAllocation: string, vcpuCount: number, virtualMemory: number,
+  bridgedConnection: string, networkDevice: string)
+{
+  let bodyData = {machineName, isoImageId, osVariantId, virtualDiskSize, sparseDiskAllocation, vcpuCount, 
+    virtualMemory, bridgedConnection, networkDevice};
+
+  let response = await callDbTwig('dbos/createVmFromIsoImage', bodyData);
+  return response;
+}
+
 export async function createUserSession(identification: string, password: string)
 {
   let bodyData = { identification, password };
@@ -67,6 +78,18 @@ export async function createUserSession(identification: string, password: string
   return response;
 }
 
+export async function getIsoImages()
+{
+  const response = await callDbTwig('dbos/getIsoImages');
+  return response;
+}
+
+export async function getOsVariants()
+{
+  const response = await callDbTwig('dbos/getOsVariants');
+  return response;
+}
+
 export async function getServiceData()
 {
   const response = await callDbTwig('dbos/getServiceData');
@@ -81,13 +104,6 @@ export async function getServiceData()
 export async function getVirtualMachines()
 {
   const response = await callDbTwig('dbos/getVirtualMachines')
-  return response;
-}
-
-export async function getVMSeedImages(objectType: string)
-{
-  let body = { objectType }
-  const response = await callDbTwig('dbos/getVMSeedImages', body);
   return response;
 }
 

@@ -1,6 +1,44 @@
 create or replace
 package body restapi as
 
+  procedure create_vm_from_iso_image
+  (
+    p_json_parameters                 json_object_t
+  )
+
+  is
+
+    l_machine_name                    virtual_machines.machine_name%type := db_twig.get_string_parameter(p_json_parameters, 'machineName');
+    l_iso_image_id                    virtual_machines.virtual_disk_id%type := db_twig.get_string_parameter(p_json_parameters, 'isoImageId');
+    l_os_variant_id                   pls_integer := db_twig.get_number_parameter(p_json_parameters, 'osVariantId');
+    l_virtual_disk_size               pls_integer := db_twig.get_string_parameter(p_json_parameters, 'virtualDiskSize');
+    l_sparse_disk_allocation          varchar2(1) := db_twig.get_string_parameter(p_json_parameters, 'sparseDiskAllocation');
+    l_vcpu_count                      virtual_machines.vcpu_count%type := db_twig.get_string_parameter(p_json_parameters, 'vcpuCount');
+    l_virtual_memory                  virtual_machines.virtual_memory%type := db_twig.get_string_parameter(p_json_parameters, 'virtualMemory');
+    l_bridged_connection              varchar2(1) := db_twig.get_string_parameter(p_json_parameters, 'bridgedConnection');
+    l_network_device                  virtual_machines.network_device%type := db_twig.get_string_parameter(p_json_parameters, 'networkDevice');
+
+  begin
+
+    vm_manager.create_vm_from_iso_image(icam.extract_session_id(p_json_parameters), l_machine_name, l_iso_image_id, l_os_variant_id,
+      l_virtual_disk_size, l_sparse_disk_allocation, l_vcpu_count, l_virtual_memory, l_bridged_connection, l_network_device);
+
+  end create_vm_from_iso_image;
+
+  function get_iso_images
+  (
+    p_json_parameters                 json_object_t
+  )
+  return clob
+
+  is
+
+  begin
+
+    return vm_manager.get_iso_images(icam.extract_session_id(p_json_parameters));
+
+  end get_iso_images;
+
   function get_service_data
   (
     p_json_parameters                 json_object_t
@@ -29,7 +67,7 @@ package body restapi as
 
   end get_virtual_machines;
 
-  function get_vm_seed_images
+  function get_os_variants
   (
     p_json_parameters                 json_object_t
   )
@@ -37,13 +75,11 @@ package body restapi as
 
   is
 
-    l_object_type                     varchar2(5) := db_twig.get_string_parameter(p_json_parameters, 'objectType');
-
   begin
 
-    return vm_manager.get_vm_seed_images(icam.extract_session_id(p_json_parameters), l_object_type);
+    return vm_manager.get_os_variants;
 
-  end get_vm_seed_images;
+  end get_os_variants;
 
   procedure start_virtual_machine
   (

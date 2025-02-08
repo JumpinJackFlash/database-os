@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from "react";
-import { Button, Input } from "@nextui-org/react";
-import { Form } from "@nextui-org/form";
+import { Button, Input } from "@heroui/react";
+import { Form } from "@heroui/form";
 import {Icon} from "@iconify/react";
 import { createUserSession } from "@/utls/serverActions";
 import { useRouter } from 'next/navigation';
