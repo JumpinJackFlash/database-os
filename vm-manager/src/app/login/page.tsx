@@ -1,18 +1,30 @@
 'use client'
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button, Input } from "@heroui/react";
 import { Form } from "@heroui/form";
-import {Icon} from "@iconify/react";
-import { createUserSession } from "@/utls/serverActions";
+import { Icon } from "@iconify/react";
+import { createUserSession } from "@/utls/serverFunctions";
 import { useRouter } from 'next/navigation';
 
-export default function LoginPage(props: any) 
+import { getServiceData } from '@/utls/serverFunctions';
+
+export default function LoginPage() 
 {
-  const { serviceTitle } = props;
+  const [ isVisible, setIsVisible ] = useState(false);
+  const [ serviceTitle, setServiceTitle ] = useState('');
 
-  const [isVisible, setIsVisible] = useState(false);
+  useEffect(() =>
+  {
+    async function callGetServiceData()
+    {
+      const response = await getServiceData();
+      setServiceTitle(response.jsonData.serviceTitle);
+    }
 
+    callGetServiceData();
+  }, []);
+  
   const router = useRouter();
 
   const toggleVisibility = () => setIsVisible(!isVisible);

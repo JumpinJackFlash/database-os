@@ -1,21 +1,22 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers';
+import { getSessionCookie } from './utls/coookieMonster';
 
 export async function middleware(request: NextRequest) 
 {
-/*
-    const cAuthPaths = ['/dashboard', '/recentlogs']
-    if (cAuthPaths.includes(request.nextUrl.pathname) && undefined === request.cookies.get('auth.msr'))
+    console.log(request.nextUrl.pathname);
+    if ('/favicon.ico' === request.nextUrl.pathname) return;
+    const cAuthPaths = ['/virtualMachines'];
+    const cookieData = await getSessionCookie();
+    if (cAuthPaths.includes(request.nextUrl.pathname) && undefined === cookieData)
     {
       console.log('middleware redirect...');
       return NextResponse.redirect(new URL('/login', request.url));       
-    } 
-*/
+    }
 
-  if ('/favicon.ico' === request.nextUrl.pathname) return;
-  const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get('sessionData');
+    if ('/' === request.nextUrl.pathname && undefined === cookieData) return NextResponse.redirect(new URL('/login', request.url));
+
+/*  const sessionCookie = await getSessionCookie();
   var sessionId = null;
   if (undefined !== sessionCookie)
   {
@@ -24,7 +25,7 @@ export async function middleware(request: NextRequest)
   }
   console.log('Path: ' + request.nextUrl.pathname + ' - sessionId: ' + sessionId);
   if ('/' === request.nextUrl.pathname && null === request.headers.get('Authorization')) return NextResponse.redirect(new URL('/login', request.url));
-  if ('/virtualMachines' === request.nextUrl.pathname && null === sessionId)  return NextResponse.redirect(new URL('/login', request.url));
+  if ('/virtualMachines' === request.nextUrl.pathname && null === sessionId)  return NextResponse.redirect(new URL('/login', request.url)); */
 }
 
 // Routes Middleware should not run on

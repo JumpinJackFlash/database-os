@@ -42,9 +42,7 @@ contents of: user-data
 password: xxxxx
 chpasswd: { expire: False }
 ssh_pwauth: True
-system_info:
-  default_user:
-    name: gilly
+user: {name: gilly}
 
 contents of: network-data
 version: 1
@@ -229,5 +227,8 @@ Import FD13LIVE.iso into AsterionDB. Use this as the seed/boot image (CD).
 Create an object for the following command:
 qemu-img create -f qcow2 /mnt/dbObscuraOra/dev/DPYORUnzEjFNcDXEeEeMSacjNVVOUxrjaZaRGargFAixZGNM/AFjIuOeRltdmRejeIfeidOljENKsgpvObFWPLWALTDDYFaLOfNgDVywFTuBbEafN.qcow2 500m
 
-
+Virtual Storage Pool Cleanup
+-----------------------------------------
+Use 'virsh pool-list --inactive --name' to generate a file of inactive pools.
+use 'virsh pool-undefine ....' in a script to remove inactive pools.
 

@@ -6,13 +6,24 @@ package restapi as
     p_json_parameters                 json_object_t
   );
 
-  function get_iso_images
+  procedure create_vm_from_qcow_image
+  (
+    p_json_parameters                 json_object_t
+  );
+
+  function get_iso_seed_images
   (
     p_json_parameters                 json_object_t
   )
   return clob;
 
   function get_os_variants
+  (
+    p_json_parameters                 json_object_t
+  )
+  return clob;
+
+  function get_qcow2_seed_images
   (
     p_json_parameters                 json_object_t
   )
