@@ -10,7 +10,7 @@ export async function createSessionCookie(sessionId: string, accountType: string
     JSON.stringify({sessionId: sessionId, accountType: accountType}),
     {
       httpOnly: true,
-      secure: String(process.env.DB_TWIG_URL).includes('https'),
+      secure: false,
       sameSite: 'lax'
     });
 }
