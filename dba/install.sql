@@ -76,8 +76,6 @@ create sequence id_seq minvalue 1 maxvalue 999999999999 cycle;
 create table virtual_machines
 (
   virtual_machine_id                number(12) primary key,
-  user_id                           number(12) not null
-    references icam_users(user_id),
   creation_timestamp                timestamp default systimestamp at time zone 'utc' not null,
   machine_name                      varchar2(30) unique not null,
   virtual_disk_id                   varchar2(32) unique

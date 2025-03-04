@@ -328,7 +328,7 @@ export default function VirtualMachines({ osVariants, isoImages, qcow2Images, vm
       <div>
         <div><p><b>Create a Virtual Machine from a QCOW2 seed</b></p></div>
           <div className="columns-2 flex w-full flex-wrap md:flex-nowrap gap-4 pt-6 pb-6">
-            <Select className="w-80" label="Select a QCOW2 image" onChange={onChangeHandler.bind(onChangeHandler, setQcowImage)} selectedKeys={qcowImage}>
+            <Select className="w-80" label="Select a QCOW2 image" onChange={onChangeHandler.bind(onChangeHandler, setQcowImage)} selectedKeys={[qcowImage]}>
             {qcow2Images.map((qcow2Image) => 
             (
               <SelectItem className={"w-lg"} key={qcow2Image.objectId}>{qcow2Image.objectName + ' - ' + qcow2Image.fileExtension}</SelectItem>
