@@ -497,7 +497,7 @@ package body vm_manager as
   begin
 
     db_twig.create_dbtwig_service(p_service_name => SERVICE_NAME, p_service_owner => sys_context('USERENV', 'CURRENT_USER'),
-      p_session_validation_procedure => 'vm_manager.validate_session');
+      p_session_validation_procedure => 'restapi.validate_session');
 
   end create_dbos_service;
 
