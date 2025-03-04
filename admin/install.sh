@@ -23,7 +23,7 @@ read -p "Database name [$TWO_TASK]: " DB_NAME
 read -p "Enter the name of the database user that owns the DbTwig schema [dbtwig]: " DBTWIG_USER
 [ "${DBTWIG_USER}" == '' ] && DBTWIG_USER="dbtwig"
 
-read -p "Enter the name of the database user that owns the ICAM schema [dbtwig]: " DBTWIG_ICAM
+read -p "Enter the name of the database user that owns the ICAM schema [dbtwig_icam]: " DBTWIG_ICAM
 [ "${ICAM_USER}" == '' ] && ICAM_USER="dbtwig_icam"
 
 read -p "Enter the name of the database user that owns the AsterionDB schema [asteriondb_dgbunker]: " DGBUNKER_USER
