@@ -5,8 +5,9 @@
 */
 
 define dba_user = '&1'
-define dba_password = '&1'
-define dbos_user = '&3'
+define dba_password = '&2'
+define db_name = '&3'
+define dbos_user = '&4'
 
 spool $HOME/asterion/oracle/database-os/dba/upgrade-rc2025.09-main.log
 
