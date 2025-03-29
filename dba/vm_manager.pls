@@ -369,7 +369,7 @@ package body vm_manager as
 
     end if;
 
-    l_content:= l_content||'chpasswd: { expire: False }'||chr(10)||
+    l_content:= l_content||'chpasswd: { expire: True }'||chr(10)||
       'ssh_pwauth: True'||chr(10)||
       'user: {name: '||p_user||'}'||chr(10);
 

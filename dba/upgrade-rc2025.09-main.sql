@@ -42,3 +42,4 @@ commit;
 prompt 
 spool off;
 
+exit;
