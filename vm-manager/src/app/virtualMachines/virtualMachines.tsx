@@ -1,13 +1,13 @@
 'use client'
 
 import { getVirtualMachines, createVmFromIsoImage, createQcowVmFromTemplate, createQcowVmUsingConfigFiles, startVirtualMachine, stopVirtualMachine, terminateUserSession, 
-  undefineVirtualMachine } from "@/utls/serverFunctions";
+  undefineVirtualMachine } from "@/utils/serverFunctions";
 import { Card, CardBody, Tabs, Tab, Checkbox, Textarea, Input, Button, Divider, Autocomplete, AutocompleteItem } from "@heroui/react";
 import { useRouter } from "next/navigation";
 import React, { useState, useCallback, FocusEvent, ChangeEvent } from "react";
 import { Table,  TableHeader,  TableBody,  TableColumn,  TableRow,  TableCell } from "@heroui/table";
 import { Select, SelectItem } from "@heroui/select";
-import { OsVariantsT, SeedImagesT, VirtualMachinesT, NameserverT, SshKeyT } from "@/utls/dataTypes";
+import { OsVariantsT, SeedImagesT, VirtualMachinesT, NameserverT, SshKeyT } from "@/utils/dataTypes";
 
 interface VirtualMachinePropsI 
 {
@@ -179,7 +179,7 @@ export default function VirtualMachines({ osVariants, isoImages, qcow2Images, vm
     terminateUserSession().then((response) =>
     {
       console.log(response);
-      if (response.ok) router.push('/login');
+      if (response.ok) router.push('/deleteCookie');
     });
   }
 

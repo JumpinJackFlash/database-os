@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
-import { getSessionCookie } from './utls/coookieMonster';
+import { getSessionCookie } from './utils/coookieMonster';
 
 export async function middleware(request: NextRequest) 
 {
@@ -15,6 +15,7 @@ export async function middleware(request: NextRequest)
     }
 
     if ('/' === request.nextUrl.pathname && undefined === cookieData) return NextResponse.redirect(new URL('/login', request.url));
+    if ('/' === request.nextUrl.pathname && undefined !== cookieData) return NextResponse.redirect(new URL('/virtualMachines', request.url));
 
 /*  const sessionCookie = await getSessionCookie();
   var sessionId = null;

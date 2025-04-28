@@ -1,8 +1,8 @@
 'use server'
 import VirtualMachines from './virtualMachines'
 
-import { getOsVariants, getIsoSeedImages, getQcow2SeedImages, getVirtualMachines, ServerResponseT } from "@/utls/serverFunctions";
-import { eraseSessionCookie } from '@/utls/coookieMonster';
+import { getOsVariants, getIsoSeedImages, getQcow2SeedImages, getVirtualMachines, ServerResponseT } from "@/utils/serverFunctions";
+import { eraseSessionCookie } from '@/utils/coookieMonster';
 import { redirect } from 'next/navigation'
 
 export default async function VirtualMachinesPage() 
@@ -14,12 +14,9 @@ export default async function VirtualMachinesPage()
 
   function apiErrorHandler(response: ServerResponseT)
   {
+    console.log('wtf...!!!');
     console.log(response);
-    if (403 === response.httpStatus)
-    {
-      eraseSessionCookie();
-      return redirect('/login');
-    }
+    if (403 === response.httpStatus) return redirect('/deleteCookie');
   }
 
   const [ osResponse, isoResponse, qcow2Response, vmResponse ] = await Promise.all([ osPromise, isoPromise, qcow2Promise, vmPromise ]);

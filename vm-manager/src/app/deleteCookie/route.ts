@@ -1,4 +1,4 @@
-import { deleteSessionCookie } from '@/utls/coookieMonster';
+import { deleteSessionCookie } from '@/utils/coookieMonster';
 import { redirect } from 'next/navigation'
 
 export async function GET(request: Request) 

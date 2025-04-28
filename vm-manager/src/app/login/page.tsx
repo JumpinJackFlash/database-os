@@ -4,10 +4,10 @@ import { useState, useEffect } from "react";
 import { Button, Input } from "@heroui/react";
 import { Form } from "@heroui/form";
 import { Icon } from "@iconify/react";
-import { createUserSession } from "@/utls/serverFunctions";
+import { createUserSession } from "@/utils/serverFunctions";
 import { useRouter } from 'next/navigation';
 
-import { getServiceData } from '@/utls/serverFunctions';
+import { getServiceData } from '@/utils/serverFunctions';
 
 export default function LoginPage() 
 {
