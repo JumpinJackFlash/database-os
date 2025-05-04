@@ -1,28 +1,27 @@
 'use client'
 
-import { getVirtualMachines, createVmFromIsoImage, createQcowVmFromTemplate, createQcowVmUsingConfigFiles, startVirtualMachine, stopVirtualMachine, terminateUserSession, 
-  undefineVirtualMachine } from "@/utils/serverFunctions";
+import { createVmFromIsoImage, createQcowVmFromTemplate, createQcowVmUsingConfigFiles } from "@/utils/serverFunctions";
 import { Card, CardBody, Tabs, Tab, Checkbox, Textarea, Input, Button, Divider, Autocomplete, AutocompleteItem } from "@heroui/react";
 import { useRouter } from "next/navigation";
 import React, { useState, useCallback, FocusEvent, ChangeEvent } from "react";
 import { Table,  TableHeader,  TableBody,  TableColumn,  TableRow,  TableCell } from "@heroui/table";
 import { Select, SelectItem } from "@heroui/select";
-import { OsVariantsT, SeedImagesT, VirtualMachinesT, NameserverT, SshKeyT } from "@/utils/dataTypes";
+import { OsVariantsT, SeedImagesT, NameserverT, SshKeyT, SetIpCallbackT, RefreshVirtualMachineListT, SetSpinnerSpinning, 
+  SetSpinnerText } from "@/utils/dataTypes";
+import { addToast } from "@heroui/react";
 
-interface VirtualMachinePropsI 
+interface CreateVMPropsI 
 {
   osVariants: OsVariantsT;
   isoImages: SeedImagesT;
   qcow2Images: SeedImagesT;
-  vmImages: VirtualMachinesT;
+  refreshVirtualMachineList: RefreshVirtualMachineListT;
+  setSpinnerSpinning: SetSpinnerSpinning;
+  setSpinnerText: SetSpinnerText
 };
 
-type setIpCallbackT = (state: boolean) => void;
-
-export default function VirtualMachines({ osVariants, isoImages, qcow2Images, vmImages}: VirtualMachinePropsI) 
+export default function CreateVM({ osVariants, isoImages, qcow2Images, refreshVirtualMachineList, setSpinnerSpinning, setSpinnerText }: CreateVMPropsI) 
 {
-  const [ virtualMachines, setVirtualMachines ] = useState(vmImages);
-
   const [ isoImage, setIsoImage ] = useState('');
   const [ isoVmImageName, setIsoVmImageName ] = useState('');
   const [ isoOsVariantId, setIsoOsVariantId ] = useState<React.Key | null>('');
@@ -67,13 +66,6 @@ export default function VirtualMachines({ osVariants, isoImages, qcow2Images, vm
   const [ sshKeys, setSshKeys ] = useState<SshKeyT []>([]);
   const [ sshTableKey, setSshTableKey ] = useState(0);
 
-  const vmColumns =
-  [
-    { key: 'machineName', label: 'Machine Name' },
-    { key: 'osVariant', label: 'O/S Variant' },
-    { key: 'action', label: 'Action' }
-  ];
-
   const sshColumns =
   [
     { key: 'pubKey', label: 'Public Key'},
@@ -88,15 +80,6 @@ export default function VirtualMachines({ osVariants, isoImages, qcow2Images, vm
 
   const router = useRouter();
 
-  type VirtualMachineT = (typeof virtualMachines)[0];
-
-  function getRandomInt(min: number, max: number) 
-  {
-    const minCeiled = Math.ceil(min);
-    const maxFloored = Math.floor(max);
-    return Math.floor(Math.random() * (maxFloored - minCeiled) + minCeiled); // The maximum is exclusive and the minimum is inclusive
-  }
-  
   function addSshKey()
   {
     const newKey: SshKeyT = { id: getRandomInt(1, 1000), sshKey};
@@ -116,114 +99,70 @@ export default function VirtualMachines({ osVariants, isoImages, qcow2Images, vm
 
   function callCreateVmFromIsoImage()
   {
+    setSpinnerText('Creating VM....');
+    setSpinnerSpinning(true);
     createVmFromIsoImage(isoVmImageName, isoImage, parseInt(isoOsVariantId as string), parseInt(isoVDiskSize), 'Y', 
       parseInt(isoVCpus), parseInt(isoVMemory), isoBridged ? 'Y' : 'N', isoNetworkDevice).then((response) =>
     {
-      console.log(response);
-      getVirtualMachines().then((response) =>
+       setSpinnerSpinning(false);
+      if (response.ok)
       {
-        if (!response.ok)
-        {
-          console.log(response);
-        }
-        setVirtualMachines(response.jsonData.virtualMachines);
-      }); 
+        addToast({ color: "primary", title: "VM Created"});
+        refreshVirtualMachineList
+      }
+      else
+        console.log(response);
     });
   }
 
   function callCreateQcowVmUsingConfigFiles()
   {
+    setSpinnerText('Creating VM....');
+    setSpinnerSpinning(true);
     createQcowVmUsingConfigFiles(qcowVmImageName, qcowImage, parseInt(qcowOsVariantId as string), parseInt(qcowVCpus), parseInt(qcowVMemory), 
       qcowBridged ? 'Y' : 'N', qcowNetworkDevice, metaData, userData, networkConfig).then((response) =>
     {
-      console.log(response);
+       setSpinnerSpinning(false);
       if (response.ok)
       {
-        getVirtualMachines().then((response) =>
-        {
-          if (!response.ok)
-          {
-            console.log(response);
-          }
-          setVirtualMachines(response.jsonData.virtualMachines);
-        }); 
+        addToast({ color: "primary", title: "VM Created"});
+        refreshVirtualMachineList
       }
+      else
+        console.log(response);
     });
   }
 
   function callCreateQcowVmFromTemplate()
   {
-//    const x = nameservers as NameserverT[];
-
+    setSpinnerText('Creating VM....');
+    setSpinnerSpinning(true);
     createQcowVmFromTemplate(qcowVmImageName, qcowImage, parseInt(qcowOsVariantId as string), parseInt(qcowVCpus), parseInt(qcowVMemory), 
       qcowBridged ? 'Y' : 'N', qcowNetworkDevice, localhost, ip4Address, ip4Gateway, ip4Netmask, nameservers as NameserverT[], dnsSearch, sshKeys, 
       adminUser, adminPassword).then((response) =>
     {
-      console.log(response);
+       setSpinnerSpinning(false);
       if (response.ok)
       {
-        getVirtualMachines().then((response) =>
-        {
-          if (!response.ok)
-          {
-            console.log(response);
-          }
-          setVirtualMachines(response.jsonData.virtualMachines);
-        }); 
+        addToast({ color: "primary", title: "VM Created"});
+        refreshVirtualMachineList
       }
+      else
+        console.log(response);
     });
   }
 
-  function logout()
+  function getRandomInt(min: number, max: number) 
   {
-    terminateUserSession().then((response) =>
-    {
-      console.log(response);
-      if (response.ok) router.push('/deleteCookie');
-    });
+    const minCeiled = Math.ceil(min);
+    const maxFloored = Math.floor(max);
+    return Math.floor(Math.random() * (maxFloored - minCeiled) + minCeiled); // The maximum is exclusive and the minimum is inclusive
   }
-
-  function startVirtualMachineHandler(virtualMachineId: number)
+  
+  function onChangeHandler(setFunction: React.Dispatch<React.SetStateAction<string>>, event: ChangeEvent<HTMLSelectElement>)
   {
-    startVirtualMachine(virtualMachineId).then((response) =>
-    {
-      console.log(response);
-    })
+    setFunction(event.target.value);
   }
-
-  function stopVirtualMachineHandler(virtualMachineId: number)
-  {
-    stopVirtualMachine(virtualMachineId).then((response) =>
-    {
-      console.log(response);
-    })
-  }
-
-  function undefineVirtualMachineHandler(virtualMachineId: number)
-  {
-    undefineVirtualMachine(virtualMachineId).then((response) =>
-    {
-      console.log(response);
-    })
-  }
-
-  const renderVmCell = useCallback((virtualMachine: VirtualMachineT, columnKey: React.Key, virtualMachineId: number) => 
-  {
-    const cellValue = virtualMachine[columnKey as keyof VirtualMachineT];
-    switch (columnKey) 
-    {
-      case 'action':
-        return(
-          <div>
-            <Button onPress={startVirtualMachineHandler.bind(startVirtualMachineHandler, virtualMachineId)} >Start VM</Button>
-            <Button onPress={stopVirtualMachineHandler.bind(stopVirtualMachineHandler, virtualMachineId)} >Stop VM</Button>
-            <Button onPress={undefineVirtualMachineHandler.bind(undefineVirtualMachineHandler, virtualMachineId)} >Undefine VM</Button>
-          </div>);
-
-      default:
-        return cellValue;
-    }
-  }, []);
 
   const renderSshCell = useCallback((sshKeys: SshKeyT [], sshKey: SshKeyT, columnKey: React.Key) =>
   {
@@ -261,28 +200,18 @@ export default function VirtualMachines({ osVariants, isoImages, qcow2Images, vm
     }
   }
 
-  function onChangeHandler(setFunction: React.Dispatch<React.SetStateAction<string>>, event: ChangeEvent<HTMLSelectElement>)
+  function validateIpAddress(setIsInvalid: SetIpCallbackT, event: FocusEvent<HTMLInputElement>)
   {
-    setFunction(event.target.value);
+    if ('' === event.target.value) 
+    {
+      setIsInvalid(false);
+      return;
+    }
+    setIsInvalid(!ipAddressRegex.test(event.target.value));
   }
 
   return (
-    <div className=" max-w-screen-md flex-col gap-4 rounded-large px-8 pb-10 pt-6">
-      <p className="pb-6" ><b>Virtual Machines...</b></p>
-      <div>
-        <Table aria-label="List of Virtual Machines">
-          <TableHeader columns={vmColumns}>{(column) => <TableColumn key={column.key}>{column.label}</TableColumn>}</TableHeader>
-          <TableBody items={virtualMachines}>        
-          {(item) => 
-          (
-            <TableRow key={item.virtualMachineId}>
-              {(columnKey) => <TableCell>{renderVmCell(item, columnKey, item.virtualMachineId)}</TableCell>}
-            </TableRow>
-          )}
-          </TableBody>
-        </Table>
-      </div>
-      <Divider className="m-4 max-w-screen-md" />
+    <>
       <div>
         <div><p><b>Create a Virtual Machine from an ISO image</b></p></div>
         <div className="columns-2 flex w-full flex-wrap md:flex-nowrap gap-4 pt-6 pb-6">
@@ -334,16 +263,16 @@ export default function VirtualMachines({ osVariants, isoImages, qcow2Images, vm
               <SelectItem className={"w-lg"} key={qcow2Image.objectId}>{qcow2Image.objectName + ' - ' + qcow2Image.fileExtension}</SelectItem>
             ))}
             </Select>
-          <div>
-            <Autocomplete className="max-w-xs" label="Select an os-variant" defaultItems={osVariants} onSelectionChange={setQcowOsVariantId} selectedKey={String(qcowOsVariantId)} isVirtualized={true} >
-              { (item) => <AutocompleteItem className={"w-lg"} key={item.variantId}>{item.longName}</AutocompleteItem> }
-            </Autocomplete>
+            <div>
+              <Autocomplete className="max-w-xs" label="Select an os-variant" defaultItems={osVariants} onSelectionChange={setQcowOsVariantId} selectedKey={String(qcowOsVariantId)} isVirtualized={true} >
+                { (item) => <AutocompleteItem className={"w-lg"} key={item.variantId}>{item.longName}</AutocompleteItem> }
+              </Autocomplete>
+            </div>
           </div>
-        </div>
         <div  className="columns-1 flex w-full flex-wrap md:flex-nowrap gap-4">
           <Input value={qcowVmImageName} onValueChange={setQcowVmImageName} label="VM Image Name"/>
         </div>
-        <div className="columns-5 flex gap-4 pt-6 pb-6">
+        <div className="columns-4 flex gap-4 pt-6 pb-6">
           <Input className="w-24" label="VCPU's" labelPlacement="outside" value={qcowVCpus} onValueChange={setQcowVCpus} type="number" ></Input>
           <Input className="w-24" label="VMemory" labelPlacement="outside" value={qcowVMemory} onValueChange={setQcowVMemory} type="number" 
             endContent=
@@ -435,20 +364,6 @@ export default function VirtualMachines({ osVariants, isoImages, qcow2Images, vm
           </Tab>
         </Tabs>
       </div>
-      <Divider className="m-4 max-w-screen-md" />
-      <div>
-        <Button color="primary" type="button" onPress={logout}>Log Out...</Button>
-      </div>
-    </div>
+    </>
   );
-
-  function validateIpAddress(setIsInvalid: setIpCallbackT, event: FocusEvent<HTMLInputElement>)
-  {
-    if ('' === event.target.value) 
-    {
-      setIsInvalid(false);
-      return;
-    }
-    setIsInvalid(!ipAddressRegex.test(event.target.value));
-  }
 }

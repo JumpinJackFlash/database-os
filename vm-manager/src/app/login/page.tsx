@@ -36,7 +36,7 @@ export default function LoginPage()
     const password = (event.currentTarget.elements[1] as HTMLInputElement).value;
     createUserSession(identification, password).then((response) =>
     {
-      if (response.ok) router.push('/virtualMachines');
+      if (response.ok) router.push('/console');
     });
   };
 

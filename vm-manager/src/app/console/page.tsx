@@ -1,8 +1,7 @@
 'use server'
-import VirtualMachines from './virtualMachines'
+import Console from './console'
 
 import { getOsVariants, getIsoSeedImages, getQcow2SeedImages, getVirtualMachines, ServerResponseT } from "@/utils/serverFunctions";
-import { eraseSessionCookie } from '@/utils/coookieMonster';
 import { redirect } from 'next/navigation'
 
 export default async function VirtualMachinesPage() 
@@ -30,7 +29,7 @@ export default async function VirtualMachinesPage()
   
   return (
     <>
-      <VirtualMachines osVariants={osResponse.jsonData.osVariants} isoImages={isoResponse.jsonData.vaultObjects} vmImages={vmResponse.jsonData.virtualMachines} 
+      <Console osVariants={osResponse.jsonData.osVariants} isoImages={isoResponse.jsonData.vaultObjects} vmImages={vmResponse.jsonData.virtualMachines} 
         qcow2Images={qcow2Response.jsonData.vaultObjects} />
     </>
   );

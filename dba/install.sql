@@ -19,6 +19,8 @@ define dbtwig_user = '&3'
 define icam_user = '&4'
 define dgbunker_user = '&5'
 define dbos_user = '&6'
+define runtime_user = '&7'
+define runtime_password = '&8'
 
 connect &dba_user@"&database_name";
 
@@ -49,6 +51,19 @@ end;
 .
 /
 
+declare
+
+    l_sql_text                        clob;
+  
+begin
+
+    l_sql_text := 'grant create session to &runtime_user identified by "&runtime_password"';
+    execute immediate l_sql_text;
+
+end;
+.
+/
+
 set verify on
 
 create or replace synonym &dbos_user..db_twig for &dbtwig_user..db_twig;
@@ -69,9 +84,34 @@ grant execute on &icam_user..icam to &dbos_user;
 create or replace synonym &dbos_user..icam_users for &icam_user..icam_users;
 grant references(user_id), read on &icam_user..icam_users to &dbos_user;
 
+grant execute on dbms_aq to &dbos_user;
+grant execute on dbms_aqadm to &dbos_user;
+
+create or replace type dbos$message_t as object
+(
+  client_handle					      varchar2(24),
+  message_type					      number(4),
+  message_payload				      varchar2(4000)
+);
+.
+/
+
+show errors type dbos$message_t
+
+@createQueue
+
 alter session set current_schema = &dbos_user;
 
 create sequence id_seq minvalue 1 maxvalue 999999999999 cycle;
+
+create table vm_hosts
+(
+  host_id                           number(12) primary key,
+  host_name                         varchar2(256) unique not null,
+  status                            varchar2(7) default 'offline' not null,
+    constraint vm_host_status_chk check (status in ('offline', 'online')),
+  last_heartbeat                    timestamp
+);
 
 create table virtual_machines
 (
@@ -87,7 +127,10 @@ create table virtual_machines
   os_variant                        varchar2(30),
   network_source                    varchar2(30),
   network_device                    varchar2(30),
-  assigned_to_host                  varchar2(256)
+  default_host_id                   number(7)
+    references vm_hosts(host_id),
+  assigned_to_host_id               number(7)
+    references vm_hosts(host_id)
 );
 
 create table os_variants
@@ -101,6 +144,8 @@ create table os_variants
 @$HOME/asterion/oracle/database-os/dba/dbTwigData.sql
 
 @$HOME/asterion/oracle/database-os/dba/loadPackages.sql
+
+grant execute on &dbos_user..vm_manager_runtime to &runtime_user;
 
 grant execute on &dbos_user..restapi to &dbtwig_user;
 grant select on &dbos_user..middle_tier_map to &dbtwig_user;

@@ -89,6 +89,13 @@ export async function createUserSession(identification: string, password: string
   return response;
 }
 
+export async function deleteVirtualMachine(virtualMachineId: number, deleteBootDisk: boolean)
+{
+  const bodyData = { virtualMachineId, deleteBootDisk: deleteBootDisk};
+  const response = await callDbTwig('dbos/deleteVirtualMachine', bodyData);
+  return response;
+}
+
 export async function getIsoSeedImages()
 {
   const response = await callDbTwig('dbos/getIsoSeedImages');

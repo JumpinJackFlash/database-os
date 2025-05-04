@@ -1,3 +1,9 @@
+export type NameserverT =
+{
+  id: number,
+  nameserver: string
+}
+
 export type OsVariantT =
 {
   variantId: string,
@@ -8,6 +14,8 @@ export type OsVariantsT =
 [
   osVariant: OsVariantT
 ];
+
+export type RefreshVirtualMachineListT = () => void;
 
 export type SeedImageT =
 {
@@ -21,6 +29,18 @@ export type SeedImagesT =
 [
   seedImage: SeedImageT
 ];
+
+export type SetIpCallbackT = (state: boolean) => void;
+
+export type SetSpinnerSpinning = React.Dispatch<React.SetStateAction<boolean>>;
+
+export type SetSpinnerText = React.Dispatch<React.SetStateAction<string>>;
+
+export type SshKeyT = 
+{
+  id: number,
+  sshKey: string
+};
 
 export type VirtualMachineT =
 {
@@ -41,16 +61,3 @@ export type VirtualMachinesT =
 [
   virtualMachine: VirtualMachineT
 ];
-
-export type NameserverT =
-{
-  id: number,
-  nameserver: string
-}
-
-export type SshKeyT = 
-{
-  id: number,
-  sshKey: string
-};
-

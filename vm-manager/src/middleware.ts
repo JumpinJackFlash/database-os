@@ -6,7 +6,7 @@ export async function middleware(request: NextRequest)
 {
     console.log(request.nextUrl.pathname);
     if ('/favicon.ico' === request.nextUrl.pathname) return;
-    const cAuthPaths = ['/virtualMachines'];
+    const cAuthPaths = ['/console'];
     const cookieData = await getSessionCookie();
     if (cAuthPaths.includes(request.nextUrl.pathname) && undefined === cookieData)
     {
@@ -15,7 +15,7 @@ export async function middleware(request: NextRequest)
     }
 
     if ('/' === request.nextUrl.pathname && undefined === cookieData) return NextResponse.redirect(new URL('/login', request.url));
-    if ('/' === request.nextUrl.pathname && undefined !== cookieData) return NextResponse.redirect(new URL('/virtualMachines', request.url));
+    if ('/' === request.nextUrl.pathname && undefined !== cookieData) return NextResponse.redirect(new URL('/console', request.url));
 
 /*  const sessionCookie = await getSessionCookie();
   var sessionId = null;
