@@ -11,6 +11,11 @@ package restapi as
     p_json_parameters                 json_object_t
   );
 
+  procedure delete_virtual_machine
+  (
+    p_json_parameters                 json_object_t
+  );
+
   function get_iso_seed_images
   (
     p_json_parameters                 json_object_t

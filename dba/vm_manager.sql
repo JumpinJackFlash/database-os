@@ -41,7 +41,7 @@ as
 
   procedure create_dbos_service;
 
-  function create_virtual_disk
+  function create_virtual_disk_from_seed
   (
     p_session_id                      varchar2,
     p_disk_image_name                 varchar2,
@@ -49,7 +49,7 @@ as
   )
   return vault_objects.object_id%type;
 
-  function create_virtual_disk
+  function create_boot_disk
   (
     p_session_id                      varchar2,
     p_disk_image_name                 varchar2
@@ -108,7 +108,9 @@ as
 
   procedure delete_virtual_machine
   (
-    p_virtual_machine_id              virtual_machines.virtual_machine_id%type
+    p_session_id                      varchar2,
+    p_virtual_machine_id              virtual_machines.virtual_machine_id%type,
+    p_delete_boot_disk                boolean
   );
 
   function get_iso_seed_images
@@ -128,6 +130,12 @@ as
   function get_service_data return clob;
 
   function get_virtual_machines return clob;
+
+  function get_vm_host_name
+  (
+    p_host_id                         vm_hosts.host_id%type
+  )
+  return vm_hosts.host_name%type;
 
   procedure import_virtual_machine
   (

@@ -8,15 +8,15 @@ package body restapi as
 
   is
 
-    l_machine_name                    virtual_machines.machine_name%type := db_twig.get_string_parameter(p_json_parameters, 'machineName');
-    l_iso_image_id                    virtual_machines.virtual_disk_id%type := db_twig.get_string_parameter(p_json_parameters, 'isoImageId');
-    l_os_variant_id                   pls_integer := db_twig.get_number_parameter(p_json_parameters, 'osVariantId');
-    l_virtual_disk_size               pls_integer := db_twig.get_string_parameter(p_json_parameters, 'virtualDiskSize');
-    l_sparse_disk_allocation          varchar2(1) := db_twig.get_string_parameter(p_json_parameters, 'sparseDiskAllocation');
-    l_vcpu_count                      virtual_machines.vcpu_count%type := db_twig.get_string_parameter(p_json_parameters, 'vcpuCount');
-    l_virtual_memory                  virtual_machines.virtual_memory%type := db_twig.get_string_parameter(p_json_parameters, 'virtualMemory');
-    l_bridged_connection              varchar2(1) := db_twig.get_string_parameter(p_json_parameters, 'bridgedConnection');
-    l_network_device                  virtual_machines.network_device%type := db_twig.get_string_parameter(p_json_parameters, 'networkDevice');
+    l_machine_name                    virtual_machines.machine_name%type := db_twig.get_string(p_json_parameters, 'machineName');
+    l_iso_image_id                    virtual_machines.virtual_disk_id%type := db_twig.get_string(p_json_parameters, 'isoImageId');
+    l_os_variant_id                   pls_integer := db_twig.get_number(p_json_parameters, 'osVariantId');
+    l_virtual_disk_size               pls_integer := db_twig.get_string(p_json_parameters, 'virtualDiskSize');
+    l_sparse_disk_allocation          varchar2(1) := db_twig.get_string(p_json_parameters, 'sparseDiskAllocation');
+    l_vcpu_count                      virtual_machines.vcpu_count%type := db_twig.get_string(p_json_parameters, 'vcpuCount');
+    l_virtual_memory                  virtual_machines.virtual_memory%type := db_twig.get_string(p_json_parameters, 'virtualMemory');
+    l_bridged_connection              varchar2(1) := db_twig.get_string(p_json_parameters, 'bridgedConnection');
+    l_network_device                  virtual_machines.network_device%type := db_twig.get_string(p_json_parameters, 'networkDevice');
 
   begin
 
@@ -32,14 +32,14 @@ package body restapi as
 
   is
 
-    l_config                          varchar2(8) := db_twig.get_string_parameter(p_json_parameters, 'config');
-    l_machine_name                    virtual_machines.machine_name%type := db_twig.get_string_parameter(p_json_parameters, 'machineName');
-    l_qcow_image_id                   virtual_machines.virtual_disk_id%type := db_twig.get_string_parameter(p_json_parameters, 'qcowImageId');
-    l_os_variant_id                   pls_integer := db_twig.get_number_parameter(p_json_parameters, 'osVariantId');
-    l_vcpu_count                      virtual_machines.vcpu_count%type := db_twig.get_string_parameter(p_json_parameters, 'vcpuCount');
-    l_virtual_memory                  virtual_machines.virtual_memory%type := db_twig.get_string_parameter(p_json_parameters, 'virtualMemory');
-    l_bridged_connection              varchar2(1) := db_twig.get_string_parameter(p_json_parameters, 'bridgedConnection');
-    l_network_device                  virtual_machines.network_device%type := db_twig.get_string_parameter(p_json_parameters, 'networkDevice');
+    l_config                          varchar2(8) := db_twig.get_string(p_json_parameters, 'config');
+    l_machine_name                    virtual_machines.machine_name%type := db_twig.get_string(p_json_parameters, 'machineName');
+    l_qcow_image_id                   virtual_machines.virtual_disk_id%type := db_twig.get_string(p_json_parameters, 'qcowImageId');
+    l_os_variant_id                   pls_integer := db_twig.get_number(p_json_parameters, 'osVariantId');
+    l_vcpu_count                      virtual_machines.vcpu_count%type := db_twig.get_string(p_json_parameters, 'vcpuCount');
+    l_virtual_memory                  virtual_machines.virtual_memory%type := db_twig.get_string(p_json_parameters, 'virtualMemory');
+    l_bridged_connection              varchar2(1) := db_twig.get_string(p_json_parameters, 'bridgedConnection');
+    l_network_device                  virtual_machines.network_device%type := db_twig.get_string(p_json_parameters, 'networkDevice');
     l_meta_data                       clob;
     l_user_data                       clob;
     l_network_config                  clob;
@@ -57,24 +57,24 @@ package body restapi as
 
     if 'files' = l_config then
 
-      l_meta_data := db_twig.get_clob_parameter(p_json_parameters, 'metaData');
-      l_user_data := db_twig.get_clob_parameter(p_json_parameters, 'userData');
-      l_network_config := db_twig.get_clob_parameter(p_json_parameters, 'networkConfig');
+      l_meta_data := db_twig.get_clob(p_json_parameters, 'metaData');
+      l_user_data := db_twig.get_clob(p_json_parameters, 'userData');
+      l_network_config := db_twig.get_clob(p_json_parameters, 'networkConfig');
 
       vm_manager.create_vm_from_qcow_image(icam.extract_session_id(p_json_parameters), l_machine_name, l_qcow_image_id, l_os_variant_id,
         l_meta_data, l_user_data, l_network_config, l_vcpu_count, l_virtual_memory, l_bridged_connection, l_network_device);
 
     else
 
-      l_ip4_address := db_twig.get_string_parameter(p_json_parameters, 'ip4Address');
-      l_ip4_netmask := db_twig.get_string_parameter(p_json_parameters, 'ip4Netmask');
-      l_ip4_gateway := db_twig.get_string_parameter(p_json_parameters, 'ip4Gateway');
-      l_dns_search := db_twig.get_clob_parameter(p_json_parameters, 'dnsSearch');
-      l_nameservers := db_twig.get_array_parameter(p_json_parameters, 'nameservers');
-      l_ssh_keys := db_twig.get_array_parameter(p_json_parameters, 'sshKeys');
-      l_user := db_twig.get_string_parameter(p_json_parameters, 'user');
-      l_password := db_twig.get_string_parameter(p_json_parameters, 'password');
-      l_local_hostname := db_twig.get_string_parameter(p_json_parameters, 'localhost_name');
+      l_ip4_address := db_twig.get_string(p_json_parameters, 'ip4Address');
+      l_ip4_netmask := db_twig.get_string(p_json_parameters, 'ip4Netmask');
+      l_ip4_gateway := db_twig.get_string(p_json_parameters, 'ip4Gateway');
+      l_dns_search := db_twig.get_clob(p_json_parameters, 'dnsSearch');
+      l_nameservers := db_twig.get_array(p_json_parameters, 'nameservers');
+      l_ssh_keys := db_twig.get_array(p_json_parameters, 'sshKeys');
+      l_user := db_twig.get_string(p_json_parameters, 'user');
+      l_password := db_twig.get_string(p_json_parameters, 'password');
+      l_local_hostname := db_twig.get_string(p_json_parameters, 'localhost_name');
 
       vm_manager.create_vm_from_qcow_image(icam.extract_session_id(p_json_parameters), l_machine_name, l_qcow_image_id, l_os_variant_id,
         l_user, l_local_hostname, l_password, l_ip4_address, l_ip4_netmask, l_ip4_gateway, l_dns_search, l_nameservers,
@@ -83,6 +83,24 @@ package body restapi as
     end if;
 
   end create_vm_from_qcow_image;
+
+  procedure delete_virtual_machine
+  (
+    p_json_parameters                 json_object_t
+  )
+
+  is
+
+    l_virtual_machine_id              virtual_machines.virtual_machine_id%type;
+    l_delete_boot_disk                boolean;
+
+  begin
+
+    l_virtual_machine_id := db_twig.get_number(p_json_parameters, 'virtualMachineId');
+    l_delete_boot_disk := db_twig.get_boolean(p_json_parameters, 'deleteBootDisk');
+    vm_manager.delete_virtual_machine(icam.extract_session_id(p_json_parameters), l_virtual_machine_id, l_delete_boot_disk);
+
+  end delete_virtual_machine;
 
   function get_iso_seed_images
   (
@@ -161,7 +179,7 @@ package body restapi as
 
   as
 
-    l_virtual_machine_id              virtual_machines.virtual_machine_id%type := db_twig.get_number_parameter(p_json_parameters, 'virtualMachineId');
+    l_virtual_machine_id              virtual_machines.virtual_machine_id%type := db_twig.get_number(p_json_parameters, 'virtualMachineId');
 
   begin
 
@@ -176,7 +194,7 @@ package body restapi as
 
   as
 
-    l_virtual_machine_id              virtual_machines.virtual_machine_id%type := db_twig.get_number_parameter(p_json_parameters, 'virtualMachineId');
+    l_virtual_machine_id              virtual_machines.virtual_machine_id%type := db_twig.get_number(p_json_parameters, 'virtualMachineId');
 
   begin
 
@@ -191,7 +209,7 @@ package body restapi as
 
   as
 
-    l_virtual_machine_id              virtual_machines.virtual_machine_id%type := db_twig.get_number_parameter(p_json_parameters, 'virtualMachineId');
+    l_virtual_machine_id              virtual_machines.virtual_machine_id%type := db_twig.get_number(p_json_parameters, 'virtualMachineId');
 
   begin
 

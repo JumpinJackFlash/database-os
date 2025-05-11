@@ -1,0 +1,28 @@
+username 		%username%
+
+password		%password%
+
+; The value of database determines which database to connect to.  You can leave this value un-set to utilize 
+; a default database setting as specified by the TWO_TASK or LOCAL environment variable.  Be certain to un-set the
+; value for ORACLE_SID if you do utilize this feature. Note that you may also need to specify bequeath_detach=true
+; in sqlnet.ora when connecting via TWO_TASK, LOCAL or ORACLE_SID in order to prevent a runaway process.
+;
+; Note that when vmHostManager is run from systemctl this value is ignored and the database connection is specified in:
+; 
+;  /etc/systemd/system/dbPluginServer.service.d/override.config
+
+database 		%database%
+
+; When daemonize is set to TRUE vmHostManager will run as a background (daemon) process.  When running
+; as a daemon, a log file will always be created.  For systemd integration, this value must be false.
+
+; daemonize FALSE
+
+; The logLevel parameter is used to control the information emitted. Valid values are (use the numeric equivalent):
+;
+; LOG_LEVEL_ERROR   1
+; LOG_LEVEL_WARN    2
+; LOG_LEVEL_INFO    3
+; LOG_LEVEL_VERBOSE 4
+
+; logLevel 1
