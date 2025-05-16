@@ -21,7 +21,7 @@ RUN npm --force --legacy-peer-deps i yup@1.2.0
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY .eslintrc.json *.js* ./
+COPY .eslintrc.config.mjs *.js* ./
 COPY .env ./
 COPY src src
 COPY public public

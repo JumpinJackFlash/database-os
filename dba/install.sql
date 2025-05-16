@@ -108,6 +108,7 @@ create table vm_hosts
 (
   host_id                           number(12) primary key,
   host_name                         varchar2(256) unique not null,
+  sysinfo                           xmltype,
   status                            varchar2(7) default 'offline' not null,
     constraint vm_host_status_chk check (status in ('offline', 'online')),
   last_heartbeat                    timestamp

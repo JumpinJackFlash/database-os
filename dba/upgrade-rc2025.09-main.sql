@@ -64,6 +64,8 @@ alter table virtual_machines drop column assigned_to_host;
 alter table virtual_machines add default_host_id number(7) references vm_hosts(host_id);
 alter table virtual_machines add assigned_to_host_id number(7) references vm_hosts(host_id);
 
+alter table vm_hosts add sysinfo xmltype;
+
 REM  ...and here
 
 @loadPackages
