@@ -8,8 +8,8 @@ define dba_user = '&1'
 define dba_password = '&2'
 define db_name = '&3'
 define dbos_user = '&4'
-define runtime_user = '&5'
-define runtime_password = '&6'
+define runtime_user = 'dbos_runtime'
+define runtime_password = '#SecurityBySimplicity2020#'
 
 spool $HOME/asterion/oracle/database-os/dba/upgrade-rc2025.09-main.log
 

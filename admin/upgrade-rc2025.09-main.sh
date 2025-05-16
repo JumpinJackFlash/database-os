@@ -25,6 +25,6 @@ read -p "Enter the name of the user that owns the DATABASE-OS schema [asteriondb
 cd ~/asterion/oracle/database-os/dba
 
 echo -e "${GREEN}Upgrading Database-OS...${NC}"
-sqlplus /nolog @$HOME/asterion/oracle/database-os/dba/upgrade-rc2025.09-main.sql $DBA_USER $DBA_PASSWORD $DATABASE_NAME $DBOS_USER dbos_runtime #SecurityBySimplicity2020#
+sqlplus /nolog @$HOME/asterion/oracle/database-os/dba/upgrade-rc2025.09-main.sql $DBA_USER $DBA_PASSWORD $DATABASE_NAME $DBOS_USER
 
 
