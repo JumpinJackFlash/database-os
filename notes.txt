@@ -232,3 +232,6 @@ Virtual Storage Pool Cleanup
 Use 'virsh pool-list --inactive --name' to generate a file of inactive pools.
 use 'virsh pool-undefine ....' in a script to remove inactive pools.
 
+Image Cleanup (to create a seed image from a VM)
+------------------------------------------------
+Run /git/asterionDB/database-os/admin/oci-cleanup-image.sh

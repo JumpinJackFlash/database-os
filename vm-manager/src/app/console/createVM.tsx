@@ -108,7 +108,7 @@ export default function CreateVM({ osVariants, isoImages, qcow2Images, refreshVi
       if (response.ok)
       {
         addToast({ color: "primary", title: "VM Created"});
-        refreshVirtualMachineList
+        refreshVirtualMachineList();
       }
       else
         console.log(response);
@@ -126,7 +126,7 @@ export default function CreateVM({ osVariants, isoImages, qcow2Images, refreshVi
       if (response.ok)
       {
         addToast({ color: "primary", title: "VM Created"});
-        refreshVirtualMachineList
+        refreshVirtualMachineList();
       }
       else
         console.log(response);
@@ -145,7 +145,7 @@ export default function CreateVM({ osVariants, isoImages, qcow2Images, refreshVi
       if (response.ok)
       {
         addToast({ color: "primary", title: "VM Created"});
-        refreshVirtualMachineList
+        refreshVirtualMachineList();
       }
       else
         console.log(response);
