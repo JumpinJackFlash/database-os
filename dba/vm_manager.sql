@@ -41,6 +41,13 @@ as
 
   procedure create_dbos_service;
 
+  procedure create_seed_from_virtual_disk
+  (
+    p_session_id                      varchar2,
+    p_seed_image_name                 varchar2,
+    p_virtual_disk_id                 virtual_machines.virtual_disk_id%type
+  );
+
   function create_virtual_disk_from_seed
   (
     p_session_id                      varchar2,

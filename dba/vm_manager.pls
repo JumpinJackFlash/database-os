@@ -12,6 +12,7 @@ package body vm_manager as
 
   ISO_IMAGES                          constant varchar2(10) := 'ISO Images';
   QCOW2_SEED_IMAGES                   constant varchar2(11) := 'QCOW2 Seeds';
+  QCOW2_SEED_EXTENSION                constant varchar2(10) := 'qcow2-seed';
 
   VDISK_FILE_MODE                     constant pls_integer := 600;
   VCDROM_FILE_MODE                    constant pls_integer := 701;
@@ -491,6 +492,38 @@ package body vm_manager as
       p_session_validation_procedure => 'restapi.validate_session');
 
   end create_dbos_service;
+
+  procedure create_seed_from_virtual_disk
+  (
+    p_session_id                      varchar2,
+    p_seed_image_name                 varchar2,
+    p_virtual_disk_id                 virtual_machines.virtual_disk_id%type
+  )
+
+  is
+
+    l_dest_object_id                  vault_objects.object_id%type;
+
+    l_response                        json_object_t;
+
+    l_source_blob                     blob;
+    l_dest_blob                       blob;
+
+  begin
+
+    l_response := json_object_t(dgbunker_service.create_an_object(p_session_id => p_session_id, p_source_path => p_seed_image_name||'.'||QCOW2_SEED_EXTENSION,
+        p_client_address => sys_context('userenv', 'ip_address'), p_program_name => 'vm_manager.create_seed_from_virtual_disk'));
+    l_dest_object_id := l_response.get_string('objectId');
+
+    commit;
+
+    l_source_blob := dgbunker_service.get_blob_locator(p_object_id => p_virtual_disk_id);
+
+    l_dest_blob := dgbunker_service.get_blob_locator(p_object_id => l_dest_object_id, p_for_update => dgbunker_service.OPTION_ENABLED);
+    dgbunker_service.set_blob_value(l_dest_object_id, l_source_blob);
+    dgbunker_service.release_blob_locator(p_object_id => l_dest_object_id, p_for_update => dgbunker_service.OPTION_ENABLED);
+
+  end create_seed_from_virtual_disk;
 
   function create_virtual_disk_from_seed
   (
