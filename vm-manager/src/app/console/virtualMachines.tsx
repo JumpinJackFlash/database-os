@@ -51,7 +51,7 @@ export default function VirtualMachines({ vmImages, setSpinnerSpinning, setSpinn
       {
         if (response.ok)
         { 
-          addToast({ color: "primary", title: "VN Deleted"});
+          addToast({ color: "primary", title: "VM Deleted"});
           refreshVirtualMachineList();
         }
         else
