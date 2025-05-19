@@ -231,7 +231,7 @@ export default function CreateVM({ osVariants, isoImages, qcow2Images, refreshVi
           <Input value={isoVmImageName} onValueChange={setIsoVmImageName} label="VM Image Name"/>
         </div>
         <div className="columns-5 flex gap-4 pt-6 pb-6">
-          <Input className="w-24" label="VDisk Size" labelPlacement="outside" value={isoVDiskSize} onValueChange={setIsoVDiskSize} type="number" 
+          <Input className="w-24" label="VDisk Size" labelPlacement="outside" value={isoVDiskSize} onValueChange={setIsoVDiskSize} type="number" min={1}
             endContent=
             {
               <div className="pointer-events-none flex items-center">
@@ -239,8 +239,8 @@ export default function CreateVM({ osVariants, isoImages, qcow2Images, refreshVi
               </div>
             }
           ></Input>
-          <Input className="w-24" label="VCPU's" labelPlacement="outside" value={isoVCpus} onValueChange={setIsoVCpus} type="number" ></Input>
-          <Input className="w-24" label="VMemory" labelPlacement="outside" value={isoVMemory} onValueChange={setIsoVMemory} type="number" 
+          <Input className="w-24" label="VCPU's" labelPlacement="outside" value={isoVCpus} onValueChange={setIsoVCpus} type="number"  min={1}></Input>
+          <Input className="w-24" label="VMemory" labelPlacement="outside" value={isoVMemory} onValueChange={setIsoVMemory} type="number"  min={1}
             endContent=
             {
               <div className="pointer-events-none flex items-center">
@@ -273,8 +273,8 @@ export default function CreateVM({ osVariants, isoImages, qcow2Images, refreshVi
           <Input value={qcowVmImageName} onValueChange={setQcowVmImageName} label="VM Image Name"/>
         </div>
         <div className="columns-4 flex gap-4 pt-6 pb-6">
-          <Input className="w-24" label="VCPU's" labelPlacement="outside" value={qcowVCpus} onValueChange={setQcowVCpus} type="number" ></Input>
-          <Input className="w-24" label="VMemory" labelPlacement="outside" value={qcowVMemory} onValueChange={setQcowVMemory} type="number" 
+          <Input className="w-24" label="VCPU's" labelPlacement="outside" value={qcowVCpus} onValueChange={setQcowVCpus} type="number"  min={1}></Input>
+          <Input className="w-24" label="VMemory" labelPlacement="outside" value={qcowVMemory} onValueChange={setQcowVMemory} type="number" min={1}
             endContent=
             {
               <div className="pointer-events-none flex items-center">

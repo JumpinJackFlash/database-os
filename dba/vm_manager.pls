@@ -365,7 +365,7 @@ package body vm_manager as
       'ssh_pwauth: True'||chr(10)||
       'user: {name: '||p_user||'}'||chr(10);
 
-    if p_authorized_ssh_keys is not null then
+    if p_authorized_ssh_keys.get_size != 0 then
 
       l_content := l_content||'ssh_authorized_keys: '||chr(10);
 
@@ -377,6 +377,10 @@ package body vm_manager as
       end loop;
 
     end if;
+
+    l_content := l_content||'packages:'||chr(10);
+    l_content := l_content||' - podman'||chr(10);
+    l_content := l_content||' - wget'||chr(10);
 
     l_clob := dgbunker_service.get_clob_locator(p_object_id => l_user_data_id, p_for_update => dgbunker_service.OPTION_ENABLED);
     dgbunker_service.set_clob_value(l_user_data_id, l_content);
