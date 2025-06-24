@@ -23,6 +23,84 @@ package body vm_manager as
 
   g_plugin_process                    json_object_t;
 
+  function get_cpu_count
+  (
+    p_host_id                         vm_hosts.host_id%type
+  )
+  return pls_integer
+
+  is
+
+    l_host_capabilities               vm_hosts.host_capabilities%type;
+    l_xml_doc                         dbms_xmldom.DOMDocument;
+    l_xml_element                     dbms_xmldom.DOMElement;
+    l_node_list                       dbms_xmldom.DOMNodelist;
+    l_node                            dbms_xmldom.DOMNode;
+    l_attributes                      dbms_xmldom.DOMNamedNodeMap;
+    l_attribute                       dbms_xmldom.DOMAttr;
+
+  begin
+
+    select  host_capabilities
+      into  l_host_capabilities
+      from  vm_hosts
+     where  host_id = p_host_id;
+
+    l_xml_doc := dbms_xmldom.newDOMDocument(l_host_capabilities);
+    l_xml_element := dbms_xmldom.getDocumentElement(l_xml_doc);
+
+    l_node_list := dbms_xmldom.getElementsByTagName(l_xml_element, 'cpus');
+    l_node := dbms_xmldom.item(l_node_list, 0);
+    l_attributes := dbms_xmldom.getattributes(l_node);
+    l_node := dbms_xmldom.getnameditem(l_attributes, 'num');
+    l_attribute := dbms_xmldom.makeattr(l_node);
+    return to_number(dbms_xmldom.getvalue(l_attribute));
+
+  end get_cpu_count;
+
+-- This function is dependent upon a specific XML format returned by libvirt....
+
+  function get_installed_memory
+  (
+    p_host_id                         vm_hosts.host_id%type
+  )
+  return pls_integer
+
+  is
+
+    l_sysinfo                         vm_hosts.sysinfo%type;
+    l_xml_doc                         dbms_xmldom.DOMDocument;
+    l_xml_element                     dbms_xmldom.DOMElement;
+    l_node_list                       dbms_xmldom.DOMNodelist;
+    l_node                            dbms_xmldom.DOMNode;
+    l_child                           dbms_xmldom.DOMNode;
+    l_installed_memory                pls_integer := 0;
+
+  begin
+
+    select  sysinfo
+      into  l_sysinfo
+      from  vm_hosts
+     where  host_id = p_host_id;
+
+    l_xml_doc := dbms_xmldom.newDOMDocument(l_sysinfo);
+    l_xml_element := dbms_xmldom.getDocumentElement(l_xml_doc);
+
+    l_node_list := dbms_xmldom.getElementsByTagName(l_xml_element, 'memory_device');
+    for x in 0..dbms_xmldom.getlength(l_node_list) - 1 loop
+
+      l_node := dbms_xmldom.item(l_node_list, x);
+      l_node := dbms_xmldom.getFirstChild(l_node);
+
+      l_child := dbms_xmldom.getfirstchild(l_node);
+      l_installed_memory := l_installed_memory + to_number(substr(dbms_xmldom.getnodevalue(l_child), 1, instr(dbms_xmldom.getnodevalue(l_child), ' ')));
+
+    end loop;
+
+    return l_installed_memory;
+
+  end get_installed_memory;
+
   function get_seed_images
   (
     p_session_id                      varchar2,
@@ -874,8 +952,7 @@ package body vm_manager as
                           'osVariant'         is os_variant,
                           'networkSource'     is network_source,
                           'networkDevice'     is network_device,
-                          'defaultHost'       is vm_manager.get_vm_host_name(default_host_id),
-                          'assignedToHost'    is vm_manager.get_vm_host_name(assigned_to_host_id)) order by machine_name returning clob) returning clob)
+                          'host'              is vm_manager.get_vm_host_name(host_id)) order by machine_name returning clob) returning clob)
       into  l_rows, l_result
       from  virtual_machines;
 
@@ -888,6 +965,36 @@ package body vm_manager as
       return l_result;
 
   end get_virtual_machines;
+
+  function get_vm_hosts return clob
+
+  is
+
+    l_result                          clob;
+    l_rows                            pls_integer;
+
+  begin
+
+    select  count(*), json_object('vmHosts' is json_arrayagg(json_object(
+              'hostName'          is host_name,
+              'status'            is status,
+              'lastUpdate'        is db_twig.convert_date_to_unix_timestamp(last_update),
+              'installedMemory'   is get_installed_memory(host_id),
+              'cpuCount'          is get_cpu_count(host_id),
+              'hypervisorVersion' is hypervisor_version,
+              'libvirtVersion'    is libvirt_version) order by host_name returning clob) returning clob)
+      into  l_rows, l_result
+      from  vm_hosts;
+
+    if 0 = l_rows then
+
+      return db_twig.empty_json_array('vmHosts');
+
+    end if;
+
+    return l_result;
+
+  end get_vm_hosts;
 
   function get_vm_host_name
   (

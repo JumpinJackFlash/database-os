@@ -15,14 +15,16 @@
 
 #include "commonDefs.h"
 
+#include "oraDataLayer.h"
 #include "vmHostMonitorDefs.h"
-#include "dataLayer.h"
 #include "vmHosts.h"
 
 static char configFile[MAXPATH];
 static char configFilePath[MAXPATH];
 static int daemonize = FALSE;
 static char text2Log[LOGMSG_LENGTH];
+
+char hostName[HOSTNAME_MAX];
 
 static int processCommandLine(int argc, char *argv[])
 {
@@ -164,6 +166,10 @@ int rc = E_SUCCESS;
 
   setLocationOfConfigFile(configFile);
   rc = processConfigFile();
+  if (rc) goto exitPoint;
+
+  bzero(hostName, sizeof(hostName));
+  rc = getHostName(hostName, sizeof(hostName));
   if (rc) goto exitPoint;
 
   rc = openLogFile(PROGRAM_NAME, homeDirectory);

@@ -120,6 +120,18 @@ as
     p_delete_boot_disk                boolean
   );
 
+  function get_cpu_count
+  (
+    p_host_id                         vm_hosts.host_id%type
+  )
+  return pls_integer;
+
+  function get_installed_memory
+  (
+    p_host_id                         vm_hosts.host_id%type
+  )
+  return pls_integer;
+
   function get_iso_seed_images
   (
     p_session_id                      varchar2
@@ -143,6 +155,8 @@ as
     p_host_id                         vm_hosts.host_id%type
   )
   return vm_hosts.host_name%type;
+
+  function get_vm_hosts return clob;
 
   procedure import_virtual_machine
   (

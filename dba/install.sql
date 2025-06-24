@@ -109,9 +109,14 @@ create table vm_hosts
   host_id                           number(12) primary key,
   host_name                         varchar2(256) unique not null,
   sysinfo                           xmltype,
+  host_capabilities                 xmltype,
+  hypervisor_version                number(8),
+  libvirt_version                   number(8),
+  os_release                        varchar2(64),
+  machine_type                      varchar2(64),
   status                            varchar2(7) default 'offline' not null,
     constraint vm_host_status_chk check (status in ('offline', 'online')),
-  last_heartbeat                    timestamp
+  last_update                       timestamp
 );
 
 create table virtual_machines
@@ -128,9 +133,7 @@ create table virtual_machines
   os_variant                        varchar2(30),
   network_source                    varchar2(30),
   network_device                    varchar2(30),
-  default_host_id                   number(7)
-    references vm_hosts(host_id),
-  assigned_to_host_id               number(7)
+  host_id                           number(7)
     references vm_hosts(host_id)
 );
 
@@ -147,6 +150,7 @@ create table os_variants
 @$HOME/asterion/oracle/database-os/dba/loadPackages.sql
 
 grant execute on &dbos_user..vm_manager_runtime to &runtime_user;
+create synonym &runtime_user..vm_manager_runtime for &dbos_user..vm_manager_runtime;
 
 grant execute on &dbos_user..restapi to &dbtwig_user;
 grant select on &dbos_user..middle_tier_map to &dbtwig_user;

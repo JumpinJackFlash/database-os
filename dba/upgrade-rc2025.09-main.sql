@@ -54,6 +54,12 @@ create table vm_hosts
 (
   host_id                           number(12) primary key,
   host_name                         varchar2(256) unique not null,
+  sysinfo                           xmltype,
+  host_capabilities                 xmltype,
+  hypervisor_version                number(8),
+  libvirt_version                   number(8),
+  os_release                        varchar2(64),
+  machine_type                      varchar2(64),
   status                            varchar2(7) default 'offline' not null,
     constraint vm_host_status_chk check (status in ('offline', 'online')),
   last_heartbeat                    timestamp
@@ -61,10 +67,7 @@ create table vm_hosts
 
 alter table virtual_machines drop column assigned_to_host;
 
-alter table virtual_machines add default_host_id number(7) references vm_hosts(host_id);
-alter table virtual_machines add assigned_to_host_id number(7) references vm_hosts(host_id);
-
-alter table vm_hosts add sysinfo xmltype;
+alter table virtual_machines add host_id number(7) references vm_hosts(host_id);
 
 REM  ...and here
 
