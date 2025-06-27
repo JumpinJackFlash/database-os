@@ -10,5 +10,7 @@
 
 int connectToVmHost(void);
 void disconnectFromVmHost(void);
+int monitorDomainEvents(void);
+int setupEventLoop(void);
 
 #endif /* VMHOSTS_H_ */

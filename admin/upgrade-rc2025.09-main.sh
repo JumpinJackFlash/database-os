@@ -22,9 +22,12 @@ done
 read -p "Enter the name of the user that owns the DATABASE-OS schema [asteriondb_dbos]]: " DBOS_USER
 [ "${DBOS_USER}" == '' ] && DBOS_USER="asteriondb_dbos"
 
+read -p "Enter the name of the database user that owns the ELOG schema [dbtwig_elog]: " DBTWIG_ELOG
+[ "${ELOG_USER}" == '' ] && ELOG_USER="dbtwig_elog"
+
 cd ~/asterion/oracle/database-os/dba
 
 echo -e "${GREEN}Upgrading Database-OS...${NC}"
-sqlplus /nolog @$HOME/asterion/oracle/database-os/dba/upgrade-rc2025.09-main.sql $DBA_USER $DBA_PASSWORD $DATABASE_NAME $DBOS_USER
+sqlplus /nolog @$HOME/asterion/oracle/database-os/dba/upgrade-rc2025.09-main.sql $DBA_USER $DBA_PASSWORD $DATABASE_NAME $DBOS_USER $ELOG_USER
 
 

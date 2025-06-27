@@ -3,7 +3,6 @@ package body vm_manager as
 
   PLUGIN_MODULE                       constant varchar2(15) := 'virtualMachines';
 
-  SERVICE_NAME                        constant varchar2(4) := 'dbos';
   SERVICE_TITLE                       constant varchar2(27) := 'AsterionDB - Database O/S';
 
   VM_COMPONENTS_KG                    constant varchar2(26) := 'Virtual Machine Components';
@@ -156,6 +155,37 @@ package body vm_manager as
       p_columns_to_return => l_columns_to_return);
 
   end get_seed_images;
+
+  procedure send_message_to_host_monitor
+  (
+    p_message                         dbos$message_t)
+
+  as
+
+    l_enqueue_options                 DBMS_AQ.enqueue_options_t;
+    l_message_properties              DBMS_AQ.message_properties_t;
+    l_message_handle                  raw(16);
+    l_schema_owner                    varchar2(128);
+
+  begin
+
+    select  sys_context('USERENV', 'CURRENT_SCHEMA')
+      into  l_schema_owner
+      from  dual;
+
+    l_message_properties.expiration := MESSAGE_EXPIRATION;
+    l_enqueue_options.visibility := DBMS_AQ.IMMEDIATE;
+    l_enqueue_options.delivery_mode := DBMS_AQ.BUFFERED;
+    l_message_properties.delay := DBMS_AQ.NO_DELAY;
+
+    dbms_aq.enqueue(
+      queue_name => l_schema_owner||'.'||vm_manager.MESSAGE_QUEUE,
+      enqueue_options => l_enqueue_options,
+      message_properties => l_message_properties,
+      payload => p_message,
+      msgid => l_message_handle);
+
+  end send_message_to_host_monitor;
 
   procedure start_virtual_machine_action
   (

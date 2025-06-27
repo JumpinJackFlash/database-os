@@ -3,6 +3,19 @@ package vm_manager
 
 as
 
+  SERVICE_NAME                        constant varchar2(4) := 'dbos';
+
+  MESSAGE_EXPIRATION                  constant pls_integer := 5;
+  MESSAGE_QUEUE                       constant varchar2(17) := 'dbos$vm_monitor_q';
+
+-- Error codes and messages. DbTwig has reserved -20000 to -20199. Start with -20200
+
+  UNAUTHORIZED_VM_DETECTED            constant pls_integer := -20200;
+  UNAUTHORIZED_VM_DETECTED_EMSG       constant varchar2(45) := 'A VM was detected that should not be running.';
+
+  VM_STATE_MISMATCH                   constant pls_integer := -20201;
+  VM_STATE_MISMATCH_EMSG              constant varchar2(33) := 'A VM state mismatch was detected.';
+
   function create_cloud_init_cdrom_image
   (
     p_session_id                      varchar2,

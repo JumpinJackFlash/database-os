@@ -16,11 +16,12 @@ spool install.log
 define dba_user = '&1'
 define database_name = '&2'
 define dbtwig_user = '&3'
-define icam_user = '&4'
-define dgbunker_user = '&5'
-define dbos_user = '&6'
-define runtime_user = '&7'
-define runtime_password = '&8'
+define elog_user = '&4'
+define icam_user = '&5'
+define dgbunker_user = '&6'
+define dbos_user = '&7'
+define runtime_user = '&8'
+define runtime_password = '&9'
 
 connect &dba_user@"&database_name";
 
@@ -90,6 +91,7 @@ grant execute on dbms_aqadm to &dbos_user;
 create or replace type dbos$message_t as object
 (
   client_handle					      varchar2(24),
+  host_name                           varchar2(256),
   message_type					      number(4),
   message_payload				      varchar2(4000)
 );
@@ -131,8 +133,15 @@ create table virtual_machines
   vcpu_count                        number(4),
   virtual_memory                    number(6),
   os_variant                        varchar2(30),
+  uuid                              varchar2(36),
+  persistent                        varchar2(1)
+    constraint persistent_chk check (persistent in ('Y', 'N')),
+  lifecycle_state                   varchar2(11) default 'stopped' not null
+    constraint lifecycle_state_chk check (lifecycle_state in ('unknown', 'running', 'blocked', 'paused', 'stopped', 'shutdown', 'crashed', 'pmsuspended')),
   network_source                    varchar2(30),
   network_device                    varchar2(30),
+  ip_addresses                      clob
+    constraint ip_addresses_chk check(ip_addresses is json),
   host_id                           number(7)
     references vm_hosts(host_id)
 );
@@ -154,6 +163,12 @@ create synonym &runtime_user..vm_manager_runtime for &dbos_user..vm_manager_runt
 
 grant execute on &dbos_user..restapi to &dbtwig_user;
 grant select on &dbos_user..middle_tier_map to &dbtwig_user;
+
+grant execute on &elog_user..error_logger to &dbos_user;
+create or replace synonym &dbos_user..error_logger for &elog_user..error_logger;
+
+grant read on &elog_user..api_errors to &dbos_user;
+create or replace synonym &dbos_user..api_errors for &elog_user..api_errors;
 
 begin vm_manager.create_dbos_service; end;
 .

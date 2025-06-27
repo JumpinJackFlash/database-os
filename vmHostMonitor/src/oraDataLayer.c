@@ -211,3 +211,26 @@ exit_point:
 
   return rc;
 }
+
+// Yes...this violates the pattern in order to simplify specifying multiple IP addresses/devices
+
+int validateVmState(void *vjsonParms)
+{
+int rc = E_SUCCESS;
+cJSON *jsonParms = (cJSON *)vjsonParms;
+
+  rc = cJSON_PrintPreallocated(jsonParms, jsonParametersStr, sizeof(jsonParametersStr), 0);
+  if (!rc) return E_MALLOC;
+
+  logOutput(LOG_OUTPUT_ALWAYS, jsonParametersStr);
+
+  rc = OCIBindByName(dbConnStmt, &jsonParmsBV, dbSess.oraError,
+    (const OraText *)":jsonParameters", -1, jsonParametersStr, (ub4) strlen(jsonParametersStr)+1,
+    SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0, (ub4 *) 0, (sb4) OCI_DEFAULT);
+
+  rc = OCIStmtExecute(dbSess.oraSvcCtx, dbConnStmt, dbSess.oraError, 1, 0, NULL, NULL,
+    OCI_COMMIT_ON_SUCCESS);
+  if (rc && OCI_SUCCESS_WITH_INFO != rc && OCI_NO_DATA != rc) return errorHandler(rc, dbSess.oraError);
+
+  return rc;
+}

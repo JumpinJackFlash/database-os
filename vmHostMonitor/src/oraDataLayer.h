@@ -14,5 +14,6 @@ void closeStatementHandles(void);
 int registerVmHost(char *sysInfo, char *hostCapabilities, unsigned long hypervisorVersion, unsigned long libvirtVersion,
   char *osRelease, char *machineType);
 int setVmHostOffline(void);
+int validateVmState(void *jsonParms);
 
 #endif /* ORADATALAYER_H_ */

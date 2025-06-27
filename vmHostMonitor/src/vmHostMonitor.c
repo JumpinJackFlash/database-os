@@ -194,7 +194,12 @@ int rc = E_SUCCESS;
   snprintf(text2Log, sizeof(text2Log), "%s is online...", PROGRAM_NAME);
   logOutput(LOG_OUTPUT_ALWAYS, text2Log);
 
+  rc = setupEventLoop();
+
   rc = connectToVmHost();
+  if (rc) goto exitPoint;
+
+//  rc = monitorDomainEvents();
 
   disconnectFromVmHost();
 
