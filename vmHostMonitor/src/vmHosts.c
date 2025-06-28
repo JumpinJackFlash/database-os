@@ -30,7 +30,7 @@ static char *decodeState(int state)
       return "unknown";
 
     case VIR_DOMAIN_RUNNING:
-      return "running";
+      return "started";
 
     case VIR_DOMAIN_BLOCKED:
       return "blocked";
@@ -39,7 +39,7 @@ static char *decodeState(int state)
       return "paused";
 
     case VIR_DOMAIN_SHUTDOWN:
-      return "shutdown";
+      return "stopping";
 
     case VIR_DOMAIN_SHUTOFF:
       return "stopped";

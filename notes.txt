@@ -235,3 +235,7 @@ use 'virsh pool-undefine ....' in a script to remove inactive pools.
 Image Cleanup (to create a seed image from a VM)
 ------------------------------------------------
 Run /git/asterionDB/database-os/admin/oci-cleanup-image.sh
+
+Potential Issues
+------------------------------------------------
+ora-01555 (rollback segment old) & ora-22924 (rollback segment old) may cause a VM to get crapped.

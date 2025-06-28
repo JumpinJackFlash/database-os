@@ -80,7 +80,7 @@ alter table virtual_machines add uuid varchar2(36) unique;
 alter table virtual_machines add persistent varchar2(1) constraint persistent_chk check (persistent in ('Y', 'N'));
 alter table virtual_machines add ip_addresses clob constraint ip_addresses_chk check(ip_addresses is json);
 alter table virtual_machines add lifecycle_state varchar2(11) default 'stopped' not null
-  constraint lifecycle_state_chk check (lifecycle_state in ('unknown', 'running', 'blocked', 'paused', 'stopped', 'shutdown', 'crashed', 'pmsuspended'));
+  constraint lifecycle_state_chk check (lifecycle_state in ('unknown', 'starting', 'started', 'blocked', 'pausing', 'paused', 'stopping', 'stopped', 'crashed', 'pmsuspended'));
 
 
 REM  ...and here

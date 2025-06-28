@@ -85,6 +85,12 @@ grant execute on &icam_user..icam to &dbos_user;
 create or replace synonym &dbos_user..icam_users for &icam_user..icam_users;
 grant references(user_id), read on &icam_user..icam_users to &dbos_user;
 
+grant execute on &elog_user..error_logger to &dbos_user;
+create or replace synonym &dbos_user..error_logger for &elog_user..error_logger;
+
+grant read on &elog_user..api_errors to &dbos_user;
+create or replace synonym &dbos_user..api_errors for &elog_user..api_errors;
+
 grant execute on dbms_aq to &dbos_user;
 grant execute on dbms_aqadm to &dbos_user;
 
@@ -137,7 +143,7 @@ create table virtual_machines
   persistent                        varchar2(1)
     constraint persistent_chk check (persistent in ('Y', 'N')),
   lifecycle_state                   varchar2(11) default 'stopped' not null
-    constraint lifecycle_state_chk check (lifecycle_state in ('unknown', 'running', 'blocked', 'paused', 'stopped', 'shutdown', 'crashed', 'pmsuspended')),
+    constraint lifecycle_state_chk check (lifecycle_state in ('unknown', 'starting', 'started', 'blocked', 'pausing', 'paused', 'stopping', 'stopped', 'crashed', 'pmsuspended')),
   network_source                    varchar2(30),
   network_device                    varchar2(30),
   ip_addresses                      clob
@@ -163,12 +169,6 @@ create synonym &runtime_user..vm_manager_runtime for &dbos_user..vm_manager_runt
 
 grant execute on &dbos_user..restapi to &dbtwig_user;
 grant select on &dbos_user..middle_tier_map to &dbtwig_user;
-
-grant execute on &elog_user..error_logger to &dbos_user;
-create or replace synonym &dbos_user..error_logger for &elog_user..error_logger;
-
-grant read on &elog_user..api_errors to &dbos_user;
-create or replace synonym &dbos_user..api_errors for &elog_user..api_errors;
 
 begin vm_manager.create_dbos_service; end;
 .
