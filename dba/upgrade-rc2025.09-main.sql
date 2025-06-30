@@ -58,7 +58,7 @@ create or replace type dbos$message_t as object
 
 show errors type dbos$message_t
 
-@createQueue
+@createQueue &dbos_user
 
 create table vm_hosts
 (
