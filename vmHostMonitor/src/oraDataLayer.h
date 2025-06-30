@@ -8,6 +8,8 @@
 #ifndef ORADATALAYER_H_
 #define ORADATALAYER_H_
 
+extern int messageType;
+
 int connectToDatabase(void);
 int disconnectFromDatabase(void);
 void closeStatementHandles(void);
@@ -15,5 +17,7 @@ int registerVmHost(char *sysInfo, char *hostCapabilities, unsigned long hypervis
   char *osRelease, char *machineType);
 int setVmHostOffline(void);
 int validateVmState(void *jsonParms);
+int getMsgForVmHostMonitor(void);
+int breakDqSession(void);
 
 #endif /* ORADATALAYER_H_ */

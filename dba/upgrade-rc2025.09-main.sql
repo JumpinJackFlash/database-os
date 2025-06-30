@@ -34,6 +34,8 @@ begin
     execute immediate l_sql_text;
 
 end;
+.
+/
 
 grant execute on &elog_user..error_logger to &dbos_user;
 create or replace synonym &dbos_user..error_logger for &elog_user..error_logger;

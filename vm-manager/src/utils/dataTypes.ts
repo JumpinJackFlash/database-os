@@ -61,3 +61,22 @@ export type VirtualMachinesT =
 [
   virtualMachine: VirtualMachineT
 ];
+
+export type VmHostT =
+{
+  hostId: number,
+  hostName: string,
+  status: string,
+  lastUpdate: number,
+  installedMemory: number,
+  cpuCount: number,
+  hypervisorVersion: number,
+  libvirtVersion: number,
+  machineType: string,
+  osRelease: string
+};
+
+export type VmHostsT =
+[
+  vmHost: VmHostT
+];

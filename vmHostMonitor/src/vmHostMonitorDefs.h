@@ -11,6 +11,7 @@
 #define CONFIG_FILE                         "vmHostMonitor.config"
 #define PROGRAM_NAME                        "vmHostMonitor"
 
+#define MSGT_STOP_QUEUE_THREAD                  15
 
 
 #endif /* VMHOSTMONITORDEFS_H_ */

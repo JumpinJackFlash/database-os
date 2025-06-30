@@ -4,6 +4,8 @@
  *
  * A derivative of the DbPluginServer
  *
+ * For debugging purposes, set keepalive_interval = -1 in /etc/libvirt/virtqemud.conf and then systemctl restart virtqemud
+ *
  */
 
 #include <stdlib.h>
@@ -18,6 +20,7 @@
 #include "oraDataLayer.h"
 #include "vmHostMonitorDefs.h"
 #include "vmHosts.h"
+#include "dbQueueMonitor.h"
 
 static char configFile[MAXPATH];
 static char configFilePath[MAXPATH];
@@ -199,7 +202,9 @@ int rc = E_SUCCESS;
   rc = connectToVmHost();
   if (rc) goto exitPoint;
 
-//  rc = monitorDomainEvents();
+  startQueueThread();
+
+  rc = monitorDomainEvents();
 
   disconnectFromVmHost();
 
@@ -209,6 +214,7 @@ exitPoint:
 
   terminateSystemdHeartbeat();
 
+  stopQueueThread();
   closeStatementHandles();
 
   disconnectFromDatabase();

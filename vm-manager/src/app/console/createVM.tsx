@@ -7,7 +7,7 @@ import React, { useState, useCallback, FocusEvent, ChangeEvent } from "react";
 import { Table,  TableHeader,  TableBody,  TableColumn,  TableRow,  TableCell } from "@heroui/table";
 import { Select, SelectItem } from "@heroui/select";
 import { OsVariantsT, SeedImagesT, NameserverT, SshKeyT, SetIpCallbackT, RefreshVirtualMachineListT, SetSpinnerSpinning, 
-  SetSpinnerText } from "@/utils/dataTypes";
+  SetSpinnerText, VmHostsT } from "@/utils/dataTypes";
 import { addToast } from "@heroui/react";
 
 interface CreateVMPropsI 
@@ -17,10 +17,11 @@ interface CreateVMPropsI
   qcow2Images: SeedImagesT;
   refreshVirtualMachineList: RefreshVirtualMachineListT;
   setSpinnerSpinning: SetSpinnerSpinning;
-  setSpinnerText: SetSpinnerText
+  setSpinnerText: SetSpinnerText,
+  vmHosts: VmHostsT
 };
 
-export default function CreateVM({ osVariants, isoImages, qcow2Images, refreshVirtualMachineList, setSpinnerSpinning, setSpinnerText }: CreateVMPropsI) 
+export default function CreateVM({ osVariants, isoImages, qcow2Images, refreshVirtualMachineList, setSpinnerSpinning, setSpinnerText, vmHosts }: CreateVMPropsI) 
 {
   const [ isoImage, setIsoImage ] = useState('');
   const [ isoVmImageName, setIsoVmImageName ] = useState('');
@@ -66,6 +67,8 @@ export default function CreateVM({ osVariants, isoImages, qcow2Images, refreshVi
   const [ sshKeys, setSshKeys ] = useState<SshKeyT []>([]);
   const [ sshTableKey, setSshTableKey ] = useState(0);
 
+  const [ vmHostId, setVmHostId ] = useState('');
+
   const sshColumns =
   [
     { key: 'pubKey', label: 'Public Key'},
@@ -101,7 +104,7 @@ export default function CreateVM({ osVariants, isoImages, qcow2Images, refreshVi
   {
     setSpinnerText('Creating VM....');
     setSpinnerSpinning(true);
-    createVmFromIsoImage(isoVmImageName, isoImage, parseInt(isoOsVariantId as string), parseInt(isoVDiskSize), 'Y', 
+    createVmFromIsoImage(isoVmImageName, isoImage, parseInt(isoOsVariantId as string), vmHostId, parseInt(isoVDiskSize), 'Y', 
       parseInt(isoVCpus), parseInt(isoVMemory), isoBridged ? 'Y' : 'N', isoNetworkDevice).then((response) =>
     {
        setSpinnerSpinning(false);
@@ -119,7 +122,7 @@ export default function CreateVM({ osVariants, isoImages, qcow2Images, refreshVi
   {
     setSpinnerText('Creating VM....');
     setSpinnerSpinning(true);
-    createQcowVmUsingConfigFiles(qcowVmImageName, qcowImage, parseInt(qcowOsVariantId as string), parseInt(qcowVCpus), parseInt(qcowVMemory), 
+    createQcowVmUsingConfigFiles(qcowVmImageName, qcowImage, parseInt(qcowOsVariantId as string), vmHostId, parseInt(qcowVCpus), parseInt(qcowVMemory), 
       qcowBridged ? 'Y' : 'N', qcowNetworkDevice, metaData, userData, networkConfig).then((response) =>
     {
        setSpinnerSpinning(false);
@@ -137,7 +140,7 @@ export default function CreateVM({ osVariants, isoImages, qcow2Images, refreshVi
   {
     setSpinnerText('Creating VM....');
     setSpinnerSpinning(true);
-    createQcowVmFromTemplate(qcowVmImageName, qcowImage, parseInt(qcowOsVariantId as string), parseInt(qcowVCpus), parseInt(qcowVMemory), 
+    createQcowVmFromTemplate(qcowVmImageName, qcowImage, parseInt(qcowOsVariantId as string), vmHostId, parseInt(qcowVCpus), parseInt(qcowVMemory), 
       qcowBridged ? 'Y' : 'N', qcowNetworkDevice, localhost, ip4Address, ip4Gateway, ip4Netmask, nameservers as NameserverT[], dnsSearch, sshKeys, 
       adminUser, adminPassword).then((response) =>
     {
@@ -227,8 +230,14 @@ export default function CreateVM({ osVariants, isoImages, qcow2Images, refreshVi
             </Autocomplete>
           </div>
         </div>
-        <div  className="columns-1 flex w-full flex-wrap md:flex-nowrap gap-4">
+        <div  className="columns-2 flex w-full flex-wrap md:flex-nowrap gap-4">
           <Input value={isoVmImageName} onValueChange={setIsoVmImageName} label="VM Image Name"/>
+          <Select className="w-80" label="Select a VM Host Server" onChange={onChangeHandler.bind(onChangeHandler, setVmHostId)} selectedKeys={[vmHostId]}>
+            {vmHosts.map((vmHost) =>
+            (
+              <SelectItem className={"w-lg"} key={vmHost.hostId}>{vmHost.hostName}</SelectItem>
+            ))}
+          </Select>
         </div>
         <div className="columns-5 flex gap-4 pt-6 pb-6">
           <Input className="w-24" label="VDisk Size" labelPlacement="outside" value={isoVDiskSize} onValueChange={setIsoVDiskSize} type="number" min={1}
@@ -269,8 +278,14 @@ export default function CreateVM({ osVariants, isoImages, qcow2Images, refreshVi
               </Autocomplete>
             </div>
           </div>
-        <div  className="columns-1 flex w-full flex-wrap md:flex-nowrap gap-4">
+        <div  className="columns-2 flex w-full flex-wrap md:flex-nowrap gap-4">
           <Input value={qcowVmImageName} onValueChange={setQcowVmImageName} label="VM Image Name"/>
+          <Select className="w-80" label="Select a VM Host Server" onChange={onChangeHandler.bind(onChangeHandler, setVmHostId)} selectedKeys={[vmHostId]}>
+            {vmHosts.map((vmHost) =>
+            (
+              <SelectItem className={"w-lg"} key={vmHost.hostId}>{vmHost.hostName}</SelectItem>
+            ))}
+          </Select>
         </div>
         <div className="columns-4 flex gap-4 pt-6 pb-6">
           <Input className="w-24" label="VCPU's" labelPlacement="outside" value={qcowVCpus} onValueChange={setQcowVCpus} type="number"  min={1}></Input>
@@ -315,7 +330,7 @@ export default function CreateVM({ osVariants, isoImages, qcow2Images, refreshVi
                     onBlur={validateIpAddress.bind(validateIpAddress, setIp4NetmaskIsInvalid)} type="text" labelPlacement="outside"/>
                   <Input className="w-32" value={ip4Gateway} label="ip4Gateway" isInvalid={ip4GatewayIsInvalid} onValueChange={setIp4Gateway} errorMessage="Enter a valid IP Gateway"
                     onBlur={validateIpAddress.bind(validateIpAddress, setIp4GatewayIsInvalid)} type="text" labelPlacement="outside"/>
-                  <Input className="w-64" label="DNS Search Domains" value={dnsSearch} onValueChange={setDnsSearch} type="text" labelPlacement="outside"></Input>
+                  <Input className="w-64" label="Additional DNS Search Domains (separated by a space)" value={dnsSearch} onValueChange={setDnsSearch} type="text" labelPlacement="outside"></Input>
                 </div>
                 <div className="flex columns-2 gap-4 pt-6 pb-6">
                   <div >

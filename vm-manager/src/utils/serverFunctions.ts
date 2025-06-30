@@ -49,32 +49,33 @@ async function callDbTwig(apiCall: string, body?: object)
   return response;
 }
 
-export async function createVmFromIsoImage(machineName: string, isoImageId: string, osVariantId: number,
+export async function createVmFromIsoImage(machineName: string, isoImageId: string, osVariantId: number, hostId: string,
   virtualDiskSize: number, sparseDiskAllocation: string, vcpuCount: number, virtualMemory: number,
   bridgedConnection: string, networkDevice: string)
 {
   const bodyData = {machineName, isoImageId, osVariantId, virtualDiskSize, sparseDiskAllocation, vcpuCount, 
-    virtualMemory, bridgedConnection, networkDevice};
+    virtualMemory, bridgedConnection, networkDevice, hostId};
 
   const response = await callDbTwig('dbos/createVmFromIsoImage', bodyData);
   return response;
 }
 
-export async function createQcowVmUsingConfigFiles(machineName: string, qcowImageId: string, osVariantId: number, vcpuCount: number, 
-  virtualMemory: number, bridgedConnection: string, networkDevice: string, metaData: string, userData: string, networkConfig: string)
+export async function createQcowVmUsingConfigFiles(machineName: string, qcowImageId: string, osVariantId: number, 
+  hostId: string, vcpuCount: number, virtualMemory: number, bridgedConnection: string, networkDevice: string, 
+  metaData: string, userData: string, networkConfig: string)
 {
   const bodyData = {machineName, qcowImageId, osVariantId, vcpuCount, virtualMemory, bridgedConnection, networkDevice, metaData, userData, 
-    networkConfig, config: 'files'};
+    networkConfig, hostId, config: 'files'};
 
   const response = await callDbTwig('dbos/createVmFromQcowImage', bodyData);
   return response;
 }
 
-export async function createQcowVmFromTemplate(machineName: string, qcowImageId: string, osVariantId: number,
+export async function createQcowVmFromTemplate(machineName: string, qcowImageId: string, osVariantId: number, hostId: string,
   vcpuCount: number, virtualMemory: number, bridgedConnection: string, networkDevice: string, localhost_name: string, ip4Address: string, 
   ip4Gateway: string, ip4Netmask: string, nameservers: NameserverT[], dnsSearch: string, sshKeys: SshKeyT[], user: string, password: string)
 {
-  const bodyData = {machineName, qcowImageId, osVariantId, vcpuCount, virtualMemory, bridgedConnection, networkDevice, 
+  const bodyData = {machineName, qcowImageId, osVariantId, vcpuCount, virtualMemory, bridgedConnection, networkDevice, hostId,
     nameservers, dnsSearch, sshKeys, user, password, localhost_name, ip4Address, ip4Gateway, ip4Netmask, config: 'template'};
 
   const response = await callDbTwig('dbos/createVmFromQcowImage', bodyData);
@@ -128,6 +129,12 @@ export async function getServiceData()
 export async function getVirtualMachines()
 {
   const response = await callDbTwig('dbos/getVirtualMachines')
+  return response;
+}
+
+export async function getVmHosts()
+{
+  const response = await callDbTwig('dbos/getVmHosts')
   return response;
 }
 

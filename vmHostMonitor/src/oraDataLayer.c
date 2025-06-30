@@ -40,6 +40,8 @@ static sb4 oraErrorCode = OCI_SUCCESS;
 char clientHandle[CLIENT_HANDLE_LENGTH];
 int messageType;
 
+int messageType;
+
 static int errorHandler(int rc, OCIError *error)
 {
 int oraReturnCode = E_SUCCESS;
@@ -234,3 +236,73 @@ cJSON *jsonParms = (cJSON *)vjsonParms;
 
   return rc;
 }
+
+int getMsgForVmHostMonitor(void)
+{
+int rc = OCI_SUCCESS;
+cJSON *item = NULL, *jsonData = NULL;
+
+retry:
+
+/*  bzero(clientHandle, sizeof(clientHandle));
+  messageType = 0;
+  bzero(messagePayload, sizeof(messagePayload));
+
+  rc = OCIStmtExecute(dqCtx.dbCtx.dbSession.oraSvcCtx, dqCtx.callApi, dqCtx.dbCtx.dbSession.oraError, 1, 0, NULL, NULL, OCI_DEFAULT);
+  if (rc && OCI_SUCCESS_WITH_INFO != rc && OCI_NO_DATA != rc)
+  {
+    serverOraErrorHandler(rc, dqCtx.dbCtx.dbSession.oraError);
+
+    if (OCI_QUEUE_TIMEOUT == oraErrorCode) goto retry;
+
+    if (OCI_EOF_COM_CHAN == oraErrorCode || OCI_LOST_CONTACT == oraErrorCode || OCI_NOT_CONNECTED == oraErrorCode)
+    {
+      rc = reEstablishQueueConnection();
+      if (rc) return E_FATAL_QUEUE_ERROR;
+
+      goto retry;
+    }
+
+    if (OCI_ARRAY_DQ_FAIL == oraErrorCode && strstr(getOraErrorText(), OCI_CANCEL_OPERATION_TEXT))
+      return E_STOP_QUEUE_THREAD;
+
+    return(E_FATAL_QUEUE_ERROR);
+  }
+
+  jsonData = cJSON_Parse(dqCtx.dbCtx.jsonDataStr);
+
+  rc = E_JSON_ERROR;
+
+  item = cJSON_GetObjectItemCaseSensitive(jsonData, "clientHandle");
+  if (!item) goto exit_point;
+  strncpy(clientHandle, item->valuestring, sizeof(clientHandle) - 1);
+
+  item = cJSON_GetObjectItemCaseSensitive(jsonData, "messageType");
+  if (!item) goto exit_point;
+  messageType = item->valueint;
+
+  item = cJSON_GetObjectItemCaseSensitive(jsonData, "messagePayload");
+  if (!item) goto exit_point;
+  strncpy(messagePayload, item->valuestring, sizeof(messagePayload) - 1);
+
+  rc = E_SUCCESS;
+
+exit_point:
+
+  if (jsonData) cJSON_Delete(jsonData); */
+  return rc;
+}
+
+int breakDqSession(void)
+{
+int rc = E_SUCCESS;
+
+/*  OCIBreak(dqCtx.dbCtx.dbSession.oraSvcCtx, dqCtx.dbCtx.dbSession.oraError);
+  if (rc) serverOraErrorHandler(rc, dqCtx.dbCtx.dbSession.oraError);
+
+  OCIReset(dqCtx.dbCtx.dbSession.oraSvcCtx, dqCtx.dbCtx.dbSession.oraError);
+  if (rc) serverOraErrorHandler(rc, dqCtx.dbCtx.dbSession.oraError); */
+
+  return E_SUCCESS;
+}
+

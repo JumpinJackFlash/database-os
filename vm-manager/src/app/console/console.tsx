@@ -7,7 +7,7 @@ import { getVirtualMachines, terminateUserSession } from "@/utils/serverFunction
 import { Button, Divider } from "@heroui/react";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
-import { OsVariantsT, SeedImagesT, VirtualMachinesT } from "@/utils/dataTypes";
+import { OsVariantsT, SeedImagesT, VirtualMachinesT, VmHostsT } from "@/utils/dataTypes";
 import {Spinner} from "@heroui/spinner";
 
 interface ConsolePropsI 
@@ -16,9 +16,10 @@ interface ConsolePropsI
   isoImages: SeedImagesT;
   qcow2Images: SeedImagesT;
   vmImages: VirtualMachinesT;
+  vmHosts: VmHostsT;
 };
 
-export default function Console({ osVariants, isoImages, qcow2Images, vmImages}: ConsolePropsI) 
+export default function Console({ osVariants, isoImages, qcow2Images, vmImages, vmHosts }: ConsolePropsI) 
 {
   const [ virtualMachines, setVirtualMachines ] = useState(vmImages);
 
@@ -48,6 +49,8 @@ export default function Console({ osVariants, isoImages, qcow2Images, vmImages}:
     }); 
   }
 
+  console.log(vmHosts);
+
   return (
     <>
       { spinnerSpinning &&
@@ -60,7 +63,7 @@ export default function Console({ osVariants, isoImages, qcow2Images, vmImages}:
           <VirtualMachines vmImages={virtualMachines} refreshVirtualMachineList={refreshVirtualMachineList} setSpinnerSpinning={setSpinnerSpinning} setSpinnerText={setSpinnerText} />
           <Divider className="m-4 max-w-screen-md" />
           <CreateVM osVariants={osVariants} qcow2Images={qcow2Images} isoImages={isoImages} refreshVirtualMachineList={refreshVirtualMachineList} 
-            setSpinnerSpinning={setSpinnerSpinning} setSpinnerText={setSpinnerText}/>
+            setSpinnerSpinning={setSpinnerSpinning} setSpinnerText={setSpinnerText} vmHosts={vmHosts}/>
           <Divider className="m-4 max-w-screen-md" />
           <div>
             <Button color="primary" type="button" onPress={logout}>Log Out...</Button>

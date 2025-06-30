@@ -165,6 +165,7 @@ export default function VirtualMachines({ vmImages, setSpinnerSpinning, setSpinn
           )}
           </TableBody>
         </Table>
+        <Button color="primary" onPress={refreshVirtualMachineList}>Refresh</Button>
       </div>
     </>
   );

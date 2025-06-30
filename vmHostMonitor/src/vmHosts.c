@@ -186,8 +186,6 @@ struct utsname utsnameBuffer;
     logOutput(LOG_OUTPUT_ERROR, vmError->message);
   }
 
-  rc = virConnectSetKeepAlive(vmConnection, 0, 0);
-
   vmHostSysinfo = virConnectGetSysinfo(vmConnection, 0);
   vmHostCapabilities = virConnectGetCapabilities(vmConnection);
 
