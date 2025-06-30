@@ -72,7 +72,7 @@ create table vm_hosts
   machine_type                      varchar2(64),
   status                            varchar2(7) default 'offline' not null,
     constraint vm_host_status_chk check (status in ('offline', 'online')),
-  last_heartbeat                    timestamp
+  last_update                       timestamp
 );
 
 alter table virtual_machines drop column assigned_to_host;

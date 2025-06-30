@@ -11,6 +11,7 @@ package body restapi as
     l_machine_name                    virtual_machines.machine_name%type := db_twig.get_string(p_json_parameters, 'machineName');
     l_iso_image_id                    virtual_machines.virtual_disk_id%type := db_twig.get_string(p_json_parameters, 'isoImageId');
     l_os_variant_id                   pls_integer := db_twig.get_number(p_json_parameters, 'osVariantId');
+    l_host_id                         vm_hosts.host_id%type := db_twig.get_string(p_json_parameters, 'hostId');
     l_virtual_disk_size               pls_integer := db_twig.get_string(p_json_parameters, 'virtualDiskSize');
     l_sparse_disk_allocation          varchar2(1) := db_twig.get_string(p_json_parameters, 'sparseDiskAllocation');
     l_vcpu_count                      virtual_machines.vcpu_count%type := db_twig.get_string(p_json_parameters, 'vcpuCount');
@@ -21,7 +22,7 @@ package body restapi as
   begin
 
     vm_manager.create_vm_from_iso_image(icam.extract_session_id(p_json_parameters), l_machine_name, l_iso_image_id, l_os_variant_id,
-      l_virtual_disk_size, l_sparse_disk_allocation, l_vcpu_count, l_virtual_memory, l_bridged_connection, l_network_device);
+      l_host_id, l_virtual_disk_size, l_sparse_disk_allocation, l_vcpu_count, l_virtual_memory, l_bridged_connection, l_network_device);
 
   end create_vm_from_iso_image;
 
@@ -36,6 +37,7 @@ package body restapi as
     l_machine_name                    virtual_machines.machine_name%type := db_twig.get_string(p_json_parameters, 'machineName');
     l_qcow_image_id                   virtual_machines.virtual_disk_id%type := db_twig.get_string(p_json_parameters, 'qcowImageId');
     l_os_variant_id                   pls_integer := db_twig.get_number(p_json_parameters, 'osVariantId');
+    l_host_id                         vm_hosts.host_id%type := db_twig.get_string(p_json_parameters, 'hostId');
     l_vcpu_count                      virtual_machines.vcpu_count%type := db_twig.get_string(p_json_parameters, 'vcpuCount');
     l_virtual_memory                  virtual_machines.virtual_memory%type := db_twig.get_string(p_json_parameters, 'virtualMemory');
     l_bridged_connection              varchar2(1) := db_twig.get_string(p_json_parameters, 'bridgedConnection');
@@ -62,7 +64,7 @@ package body restapi as
       l_network_config := db_twig.get_clob(p_json_parameters, 'networkConfig');
 
       vm_manager.create_vm_from_qcow_image(icam.extract_session_id(p_json_parameters), l_machine_name, l_qcow_image_id, l_os_variant_id,
-        l_meta_data, l_user_data, l_network_config, l_vcpu_count, l_virtual_memory, l_bridged_connection, l_network_device);
+        l_host_id, l_meta_data, l_user_data, l_network_config, l_vcpu_count, l_virtual_memory, l_bridged_connection, l_network_device);
 
     else
 
@@ -77,7 +79,7 @@ package body restapi as
       l_local_hostname := db_twig.get_string(p_json_parameters, 'localhost_name');
 
       vm_manager.create_vm_from_qcow_image(icam.extract_session_id(p_json_parameters), l_machine_name, l_qcow_image_id, l_os_variant_id,
-        l_user, l_local_hostname, l_password, l_ip4_address, l_ip4_netmask, l_ip4_gateway, l_dns_search, l_nameservers,
+        l_host_id, l_user, l_local_hostname, l_password, l_ip4_address, l_ip4_netmask, l_ip4_gateway, l_dns_search, l_nameservers,
         l_ssh_keys, l_vcpu_count, l_virtual_memory, l_bridged_connection, l_network_device);
 
     end if;
@@ -171,6 +173,20 @@ package body restapi as
     return vm_manager.get_virtual_machines;
 
   end get_virtual_machines;
+
+  function get_vm_hosts
+  (
+    p_json_parameters                 json_object_t
+  )
+  return clob
+
+  is
+
+  begin
+
+    return vm_manager.get_vm_hosts();
+
+  end get_vm_hosts;
 
   procedure start_virtual_machine
   (

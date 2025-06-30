@@ -690,6 +690,7 @@ package body vm_manager as
     p_machine_name                    virtual_machines.machine_name%type,
     p_iso_image_id                    virtual_machines.virtual_disk_id%type,
     p_os_variant_id                   os_variants.variant_id%type,
+    p_host_id                         vm_hosts.host_id%type,
     p_virtual_disk_size               number default 0,
     p_sparse_disk_allocation          varchar2 default 'Y',
     p_vcpu_count                      virtual_machines.vcpu_count%type default 1,
@@ -724,10 +725,10 @@ package body vm_manager as
 
     insert into virtual_machines
       (virtual_machine_id, machine_name, virtual_disk_id, virtual_cdrom_id, vcpu_count, virtual_memory, os_variant,
-       network_source, network_device)
+       network_source, network_device, host_id, lifecycle_state)
     values
       (id_seq.nextval, p_machine_name, l_object_id, p_iso_image_id, p_vcpu_count, p_virtual_memory * 1024,
-       l_variant, l_network_source, p_network_device)
+       l_variant, l_network_source, p_network_device, p_host_id, 'starting')
     returning virtual_machine_id into l_virtual_machine_id;
 
     start_virtual_machine_action(p_session_id => p_session_id, p_virtual_machine_id => l_virtual_machine_id, p_virtual_disk_size => p_virtual_disk_size,
@@ -742,6 +743,7 @@ package body vm_manager as
     p_machine_name                    virtual_machines.machine_name%type,
     p_seed_image_id                   virtual_machines.virtual_disk_id%type,
     p_os_variant_id                   os_variants.variant_id%type,
+    p_host_id                         vm_hosts.host_id%type,
     p_meta_data                       clob,
     p_user_data                       clob,
     p_network_config                  clob,
@@ -778,10 +780,10 @@ package body vm_manager as
 
     insert into virtual_machines
       (virtual_machine_id, machine_name, virtual_disk_id, virtual_cdrom_id, vcpu_count, virtual_memory, os_variant,
-       network_source, network_device)
+       network_source, network_device, host_id, lifecycle_state)
     values
       (id_seq.nextval, p_machine_name, l_vdisk_id, l_cdrom_id, p_vcpu_count, p_virtual_memory * 1024,
-       l_variant, l_network_source, p_network_device)
+       l_variant, l_network_source, p_network_device, p_host_id, 'starting')
     returning virtual_machine_id into l_virtual_machine_id;
 
     start_virtual_machine_action(p_session_id => p_session_id, p_virtual_machine_id => l_virtual_machine_id, p_boot_device => 'hd',
@@ -795,6 +797,7 @@ package body vm_manager as
     p_machine_name                    virtual_machines.machine_name%type,
     p_seed_image_id                   virtual_machines.virtual_disk_id%type,
     p_os_variant_id                   os_variants.variant_id%type,
+    p_host_id                         vm_hosts.host_id%type,
     p_user                            varchar2,
     p_local_hostname                  varchar2,
     p_password                        varchar2 default null,
@@ -838,10 +841,10 @@ package body vm_manager as
 
     insert into virtual_machines
       (virtual_machine_id, machine_name, virtual_disk_id, virtual_cdrom_id, vcpu_count, virtual_memory, os_variant,
-       network_source, network_device)
+       network_source, network_device, host_id, lifecycle_state)
     values
       (id_seq.nextval, p_machine_name, l_vdisk_id, l_cdrom_id, p_vcpu_count, p_virtual_memory * 1024,
-       l_variant, l_network_source, p_network_device)
+       l_variant, l_network_source, p_network_device, p_host_id, 'starting')
     returning virtual_machine_id into l_virtual_machine_id;
 
     start_virtual_machine_action(p_session_id => p_session_id, p_virtual_machine_id => l_virtual_machine_id, p_boot_device => 'hd',
@@ -1006,13 +1009,16 @@ package body vm_manager as
   begin
 
     select  count(*), json_object('vmHosts' is json_arrayagg(json_object(
+              'hostId'            is host_id,
               'hostName'          is host_name,
               'status'            is status,
               'lastUpdate'        is db_twig.convert_date_to_unix_timestamp(last_update),
               'installedMemory'   is get_installed_memory(host_id),
               'cpuCount'          is get_cpu_count(host_id),
               'hypervisorVersion' is hypervisor_version,
-              'libvirtVersion'    is libvirt_version) order by host_name returning clob) returning clob)
+              'libvirtVersion'    is libvirt_version,
+              'machineType'       is machine_type,
+              'osRelease'         is os_release) order by host_name returning clob) returning clob)
       into  l_rows, l_result
       from  vm_hosts;
 
@@ -1101,6 +1107,10 @@ package body vm_manager as
 
   begin
 
+    update  virtual_machines
+       set  lifecycle_state = 'starting'
+     where  virtual_machine_id = p_virtual_machine_id;
+
     start_virtual_machine_action(p_session_id => p_session_id, p_virtual_machine_id => p_virtual_machine_id, p_boot_device => p_boot_device);
 
   end start_virtual_machine;
@@ -1121,6 +1131,10 @@ package body vm_manager as
     select  *
       into  l_virtual_machine
       from  virtual_machines
+     where  virtual_machine_id = p_virtual_machine_id;
+
+    update  virtual_machines
+       set  lifecycle_state = 'stopping'
      where  virtual_machine_id = p_virtual_machine_id;
 
     g_plugin_process := dbplugin_api.connect_to_plugin_server(PLUGIN_MODULE);                    -- Connect to the dbplugin_api.

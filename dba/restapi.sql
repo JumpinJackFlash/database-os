@@ -46,6 +46,12 @@ package restapi as
   )
   return clob;
 
+  function get_vm_hosts
+  (
+    p_json_parameters                 json_object_t
+  )
+  return clob;
+
   procedure start_virtual_machine
   (
     p_json_parameters                 json_object_t
