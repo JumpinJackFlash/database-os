@@ -1,0 +1,213 @@
+/*
+ * virtualMachines.c
+ *
+ *  Created on: Jul 7, 2025
+ *      Author: gilly
+ */
+
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/prctl.h>
+#include <errno.h>
+#include <malloc.h>
+#include <cjson/cJSON.h>
+#include <libvirt/libvirt.h>
+#include <libvirt/virterror.h>
+
+#include <commonDefs.h>
+
+#include "oraDataLayer.h"
+
+#define MACHINE_NAME_LENGTH                     31
+#define VDISK_FILENAME_LENGTH                   256
+#define OS_VARIANT_LENGTH                       31
+#define NETWORK_SOURCE_LENGTH                   31
+#define NETWORK_DEVICE_LENGTH                   31
+#define VDISK_OPTIONS_LENGTH                    128
+
+#define VIRT_INSTALL                            "virt-install"
+#define VIRT_SHELL                              "virsh"
+
+char *machineName, *vDiskFilename, *sparseDiskAllocation, *vCdromFilename, *osVariant, *networkSource,
+  *networkDevice, *bootDevice, commandLine[2048], *metaDataFilename, *userDataFilename, *netDataFilename;
+
+int vCpus = 0, vMemory = 0, vDiskSize = 0, rc = E_SUCCESS;
+
+FILE *process = NULL;
+
+extern int errno;
+
+int stopVirtualMachine(void)
+{
+  char text2Log[LOGMSG_LENGTH];
+  cJSON *item = NULL;
+
+  item = cJSON_GetObjectItemCaseSensitive(messagePayload, "machineName");
+  if (!item) return jsonError("machineName");
+
+  snprintf(commandLine, sizeof(commandLine), "%s -c qemu:///system shutdown %s", VIRT_SHELL, item->valuestring);
+  logOutput(LOG_OUTPUT_VERBOSE, commandLine);
+
+  process = popen(commandLine, "r");
+  if (!process)
+  {
+    snprintf(text2Log, sizeof(text2Log), "Unable to shutdown VM: %s", strerror(errno));
+    logOutput(LOG_OUTPUT_ERROR, text2Log);
+    return E_CHILD_DIED;
+  }
+
+  while (fgets(text2Log, sizeof(text2Log), process)) logOutput(LOG_OUTPUT_VERBOSE, text2Log);
+
+  pclose(process);
+
+  return E_SUCCESS;
+}
+
+int undefineVirtualMachine(void)
+{
+  char text2Log[LOGMSG_LENGTH];
+  cJSON *item = NULL;
+
+  item = cJSON_GetObjectItemCaseSensitive(messagePayload, "machineName");
+  if (!item) return jsonError("machineName");
+
+  snprintf(commandLine, sizeof(commandLine), "%s -c qemu:///system undefine %s", VIRT_SHELL, item->valuestring);
+  logOutput(LOG_OUTPUT_VERBOSE, commandLine);
+
+  process = popen(commandLine, "r");
+  if (!process)
+  {
+    snprintf(text2Log, sizeof(text2Log), "Unable to undefine VM: %s", strerror(errno));
+    logOutput(LOG_OUTPUT_ERROR, text2Log);
+    return E_CHILD_DIED;
+  }
+
+  while (fgets(text2Log, sizeof(text2Log), process)) logOutput(LOG_OUTPUT_VERBOSE, text2Log);
+
+  pclose(process);
+
+  return E_SUCCESS;
+}
+
+int createCloudInitCdrom(void)
+{
+  char text2Log[LOGMSG_LENGTH];
+  cJSON *item = NULL;
+
+  item = cJSON_GetObjectItemCaseSensitive(messagePayload, "metaDataFilename");
+  if (!item) return jsonError("metadataFilename");
+  metaDataFilename = item->valuestring;
+
+  item = cJSON_GetObjectItemCaseSensitive(messagePayload, "userDataFilename");
+  if (!item) return jsonError("userDataFilename");
+  userDataFilename = item->valuestring;
+
+  netDataFilename = NULL;
+  item = cJSON_GetObjectItemCaseSensitive(messagePayload, "netDataFilename");
+  if (item) netDataFilename = item->valuestring;
+
+  item = cJSON_GetObjectItemCaseSensitive(messagePayload, "vCdromFilename");
+  if (!item) return jsonError("vCdromFilename");
+  vCdromFilename = item->valuestring;
+
+  if (!netDataFilename)
+    snprintf(commandLine, sizeof(commandLine), "genisoimage -output %s -volid cidata -joliet -rock --graft-points user-data=%s meta-data=%s",
+      vCdromFilename, userDataFilename, metaDataFilename);
+  else
+    snprintf(commandLine, sizeof(commandLine), "genisoimage -output %s -volid cidata -joliet -rock --graft-points user-data=%s meta-data=%s network-config=%s",
+      vCdromFilename, userDataFilename, metaDataFilename, netDataFilename);
+
+  logOutput(LOG_OUTPUT_VERBOSE, commandLine);
+
+  process = popen(commandLine, "r");
+  if (!process)
+  {
+    snprintf(text2Log, sizeof(text2Log), "Unable to create cloud-inti CDROM: %s", strerror(errno));
+    logOutput(LOG_OUTPUT_ERROR, text2Log);
+    return E_CHILD_DIED;    // Shoudl use a better error code...
+  }
+
+  while (fgets(text2Log, sizeof(text2Log), process)) logOutput(LOG_OUTPUT_VERBOSE, text2Log);
+
+  pclose(process);
+
+  return E_SUCCESS;
+}
+
+int startVirtualMachine(void)
+{
+  char text2Log[LOGMSG_LENGTH];
+  char vDiskOptions[VDISK_OPTIONS_LENGTH];
+  cJSON *item = NULL;
+
+  item = cJSON_GetObjectItemCaseSensitive(messagePayload, "machineName");
+  if (!item) return jsonError("machineName");
+  machineName = item->valuestring;
+
+  item = cJSON_GetObjectItemCaseSensitive(messagePayload, "vDiskFilename");
+  if (!item) return jsonError("vDiskFilename");
+  vDiskFilename = item->valuestring;
+
+  vDiskSize = 0;
+  item = cJSON_GetObjectItemCaseSensitive(messagePayload, "vDiskSize");
+  if (item) vDiskSize = item->valueint;
+
+  item = cJSON_GetObjectItemCaseSensitive(messagePayload, "sparseDiskAllocation");
+  if (item) sparseDiskAllocation = item->valuestring;
+
+  bzero(vDiskOptions, sizeof(vDiskOptions));
+  if (vDiskSize) snprintf(vDiskOptions, sizeof(vDiskOptions)-1, ",size=%d,sparse=%s", vDiskSize, 'Y' == *sparseDiskAllocation ? "true" : "false");
+
+  vCdromFilename = NULL;
+  item = cJSON_GetObjectItemCaseSensitive(messagePayload, "vCdromFilename");
+  if (item) vCdromFilename = item->valuestring;
+
+  item = cJSON_GetObjectItemCaseSensitive(messagePayload, "vCpus");
+  if (!item) return jsonError("vCpus");
+  vCpus = item->valueint;
+
+  item = cJSON_GetObjectItemCaseSensitive(messagePayload, "vMemory");
+  if (!item) return jsonError("vMemory");
+  vMemory = item->valueint;
+
+  item = cJSON_GetObjectItemCaseSensitive(messagePayload, "osVariant");
+  if (!item) return jsonError("osVariant");
+  osVariant = item->valuestring;
+
+  item = cJSON_GetObjectItemCaseSensitive(messagePayload, "networkSource");
+  if (!item) return jsonError("networkSource");
+  networkSource = item->valuestring;
+
+  item = cJSON_GetObjectItemCaseSensitive(messagePayload, "networkDevice");
+  if (!item) return jsonError("networkDevice");
+  networkDevice = item->valuestring;
+
+  item = cJSON_GetObjectItemCaseSensitive(messagePayload, "bootDevice");
+  if (!item) return jsonError("bootDevice");
+  bootDevice = item->valuestring;
+
+  if (!vCdromFilename)
+    snprintf(commandLine, sizeof(commandLine), "%s --name %s --memory %d --vcpus %d --boot %s --disk %s --os-variant %s --virt-type kvm --network %s=%s,model=virtio --import --noautoconsole --connect qemu:///system 2>&1",
+      VIRT_INSTALL, machineName, vMemory, vCpus, bootDevice, vDiskFilename, osVariant, networkSource, networkDevice);
+  else
+    snprintf(commandLine, sizeof(commandLine), "%s --name %s --memory %d --vcpus %d --boot %s --disk %s%s --disk %s,device=cdrom --os-variant %s --virt-type kvm --network %s=%s,model=virtio --import --noautoconsole --connect qemu:///system 2>&1",
+      VIRT_INSTALL, machineName, vMemory, vCpus, bootDevice, vDiskFilename, vDiskOptions, vCdromFilename, osVariant, networkSource, networkDevice);
+
+  logOutput(LOG_OUTPUT_VERBOSE, commandLine);
+
+  process = popen(commandLine, "r");
+  if (!process)
+  {
+    snprintf(text2Log, sizeof(text2Log), "Unable to start VM: %s", strerror(errno));
+    logOutput(LOG_OUTPUT_ERROR, text2Log);
+    return E_PLUGIN_ERROR;
+  }
+
+  while (fgets(text2Log, sizeof(text2Log), process)) logOutput(LOG_OUTPUT_VERBOSE, text2Log);
+
+  pclose(process);
+
+  return E_SUCCESS;
+}

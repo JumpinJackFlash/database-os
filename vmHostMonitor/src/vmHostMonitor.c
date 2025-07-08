@@ -4,7 +4,8 @@
  *
  * A derivative of the DbPluginServer
  *
- * For debugging purposes, set keepalive_interval = -1 in /etc/libvirt/virtqemud.conf and then systemctl restart virtqemud
+ * For debugging purposes, set keepalive_count = 60 in /etc/libvirt/virtqemud.conf and then systemctl restart virtqemud. This will give you
+ * 5 minutes before the backend QEMU server will kill the connection due to keep-alive timeouts.
  *
  */
 
@@ -14,6 +15,8 @@
 #include <errno.h>
 #include <time.h>
 #include <sys/prctl.h>
+
+#include <cjson/cJSON.h>
 
 #include "commonDefs.h"
 

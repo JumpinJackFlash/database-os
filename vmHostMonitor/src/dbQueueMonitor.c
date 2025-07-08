@@ -11,9 +11,12 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <cjson/cJSON.h>
+
 #include "commonDefs.h"
 #include "oraDataLayer.h"
 #include "vmHostMonitorDefs.h"
+#include "virtualMachines.h"
 
 static pthread_t queueThreadID;
 static int queueThreadStatus = E_SUCCESS;
@@ -24,15 +27,34 @@ int rc = E_SUCCESS;
 
 wait_for_another:
 
+  messagePayload = NULL;
   rc = getMsgForVmHostMonitor();
   if (rc) return rc;
 
   switch (messageType)
   {
     case MSGT_STOP_QUEUE_THREAD:
+      if (messagePayload) cJSON_Delete(messagePayload);
       return rc;
 
+    case MSGT_START_VM:
+      rc = startVirtualMachine();
+      break;
+
+    case MSGT_STOP_VM:
+      rc = stopVirtualMachine();
+      break;
+
+    case MSGT_UNDEFINE_VM:
+      rc = undefineVirtualMachine();
+      break;
+
+    case MSGT_CREATE_CLOUD_INIT_CDROM:
+      rc = createCloudInitCdrom();
+      break;
   }
+
+  if (messagePayload) cJSON_Delete(messagePayload);
 
   goto wait_for_another;
 

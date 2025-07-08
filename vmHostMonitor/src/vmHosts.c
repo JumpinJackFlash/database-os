@@ -1,6 +1,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <malloc.h>
+#include <sys/signalfd.h>
+#include <signal.h>
+#include <unistd.h>
+#include <stdlib.h>
 #include <sys/utsname.h>
 #include <libvirt/libvirt.h>
 #include <libvirt/virterror.h>
@@ -14,7 +18,8 @@
 static virConnectPtr vmConnection = NULL;
 static virErrorPtr vmError = NULL;
 
-static char jsonParmsString[JSON_STRINGIFY_SIZE];
+static int selfSignalFD = 0;
+static int keepRunning = TRUE;
 
 static int vmHostErrorHandler(void)
 {
@@ -168,6 +173,35 @@ cJSON *jsonParms = NULL, *item = NULL, *cjInterfaces = NULL, *cjInterface = NULL
   return E_SUCCESS;
 }
 
+static void selfSignalCallback(int watch, int fd, int events, void * opaque)
+{
+  logOutput(LOG_OUTPUT_ALWAYS, "signal callback");
+  keepRunning = FALSE;
+}
+
+static int setupSelfSignal(void)
+{
+sigset_t mask;
+int rc = E_SUCCESS;
+struct sigaction sigAction;
+
+  sigemptyset(&mask);
+  sigaddset(&mask, SIGTERM);
+  sigaddset(&mask, SIGINT);
+  sigaddset(&mask, SIGQUIT);
+  sigaddset(&mask, SIGABRT);
+
+  sigAction.sa_handler = SIG_IGN;
+  rc = sigaction(SIGTERM, &sigAction, NULL);
+
+  selfSignalFD = signalfd(-1, &mask, 0);
+  if (-1 == selfSignalFD) return E_OSERR;
+
+  rc = virEventAddHandle(selfSignalFD, VIR_EVENT_HANDLE_READABLE|VIR_EVENT_HANDLE_WRITABLE|VIR_EVENT_HANDLE_ERROR|VIR_EVENT_HANDLE_HANGUP, selfSignalCallback, NULL, NULL);
+
+  return rc;
+}
+
 int connectToVmHost(void)
 {
 int rc = E_SUCCESS;
@@ -192,6 +226,8 @@ struct utsname utsnameBuffer;
   rc = virConnectGetVersion(vmConnection, &hypervisorVersion);
   rc = virConnectGetLibVersion(vmConnection, &libvirtVersion);
 
+  setupSelfSignal();
+
   rc = registerVmHost(vmHostSysinfo, vmHostCapabilities, hypervisorVersion, libvirtVersion,
     utsnameBuffer.release, utsnameBuffer.machine);
 
@@ -214,7 +250,7 @@ const char *domainName = NULL;
 
 int setupEventLoop(void)
 {
-int rc = E_SUCCESS, keepRunning = TRUE;
+int rc = E_SUCCESS;
 
   rc = virEventRegisterDefaultImpl();
 
@@ -223,7 +259,7 @@ int rc = E_SUCCESS, keepRunning = TRUE;
 
 int monitorDomainEvents(void)
 {
-int rc = E_SUCCESS, keepRunning = TRUE;
+int rc = E_SUCCESS;
 
   rc = virConnectDomainEventRegisterAny(vmConnection, NULL, VIR_DOMAIN_EVENT_ID_LIFECYCLE, VIR_DOMAIN_EVENT_CALLBACK(domainEventHandler), NULL, NULL);
 
@@ -237,9 +273,6 @@ int rc = E_SUCCESS, keepRunning = TRUE;
 
 void disconnectFromVmHost(void)
 {
-int rc = E_SUCCESS;
-
-  rc = setVmHostOffline();
-
+  setVmHostOffline();
   virConnectClose(vmConnection);
 }

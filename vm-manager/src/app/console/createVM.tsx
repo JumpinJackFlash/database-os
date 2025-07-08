@@ -3,12 +3,12 @@
 import { createVmFromIsoImage, createQcowVmFromTemplate, createQcowVmUsingConfigFiles } from "@/utils/serverFunctions";
 import { Card, CardBody, Tabs, Tab, Checkbox, Textarea, Input, Button, Divider, Autocomplete, AutocompleteItem } from "@heroui/react";
 import { useRouter } from "next/navigation";
-import React, { useState, useCallback, FocusEvent, ChangeEvent } from "react";
+import React, { useState, useContext, useCallback, FocusEvent, ChangeEvent } from "react";
 import { Table,  TableHeader,  TableBody,  TableColumn,  TableRow,  TableCell } from "@heroui/table";
 import { Select, SelectItem } from "@heroui/select";
-import { OsVariantsT, SeedImagesT, NameserverT, SshKeyT, SetIpCallbackT, RefreshVirtualMachineListT, SetSpinnerSpinning, 
-  SetSpinnerText, VmHostsT } from "@/utils/dataTypes";
+import { OsVariantsT, SeedImagesT, NameserverT, SshKeyT, SetIpCallbackT, RefreshVirtualMachineListT, VmHostsT } from "@/utils/dataTypes";
 import { addToast } from "@heroui/react";
+import { VmManagerContext } from "@/utils/vmManagerContext";
 
 interface CreateVMPropsI 
 {
@@ -16,12 +16,10 @@ interface CreateVMPropsI
   isoImages: SeedImagesT;
   qcow2Images: SeedImagesT;
   refreshVirtualMachineList: RefreshVirtualMachineListT;
-  setSpinnerSpinning: SetSpinnerSpinning;
-  setSpinnerText: SetSpinnerText,
   vmHosts: VmHostsT
 };
 
-export default function CreateVM({ osVariants, isoImages, qcow2Images, refreshVirtualMachineList, setSpinnerSpinning, setSpinnerText, vmHosts }: CreateVMPropsI) 
+export default function CreateVM({ osVariants, isoImages, qcow2Images, refreshVirtualMachineList, vmHosts }: CreateVMPropsI) 
 {
   const [ isoImage, setIsoImage ] = useState('');
   const [ isoVmImageName, setIsoVmImageName ] = useState('');
@@ -83,6 +81,8 @@ export default function CreateVM({ osVariants, isoImages, qcow2Images, refreshVi
 
   const router = useRouter();
 
+  const vmManagerContext = useContext(VmManagerContext);
+
   function addSshKey()
   {
     const newKey: SshKeyT = { id: getRandomInt(1, 1000), sshKey};
@@ -102,56 +102,41 @@ export default function CreateVM({ osVariants, isoImages, qcow2Images, refreshVi
 
   function callCreateVmFromIsoImage()
   {
-    setSpinnerText('Creating VM....');
-    setSpinnerSpinning(true);
+    vmManagerContext?.setSpinnerState(true, 'Creating VM....');
     createVmFromIsoImage(isoVmImageName, isoImage, parseInt(isoOsVariantId as string), vmHostId, parseInt(isoVDiskSize), 'Y', 
       parseInt(isoVCpus), parseInt(isoVMemory), isoBridged ? 'Y' : 'N', isoNetworkDevice).then((response) =>
     {
-       setSpinnerSpinning(false);
-      if (response.ok)
-      {
-        addToast({ color: "primary", title: "VM Created"});
-        refreshVirtualMachineList();
-      }
-      else
-        console.log(response);
+      vmManagerContext?.setSpinnerState(false);
+      if (!response.ok) return vmManagerContext?.showErrorModal(response.jsonData.errorMessage);
+      addToast({ color: "primary", title: "VM Created"});
+      refreshVirtualMachineList();
     });
   }
 
   function callCreateQcowVmUsingConfigFiles()
   {
-    setSpinnerText('Creating VM....');
-    setSpinnerSpinning(true);
+    vmManagerContext?.setSpinnerState(true, 'Creating VM....');
     createQcowVmUsingConfigFiles(qcowVmImageName, qcowImage, parseInt(qcowOsVariantId as string), vmHostId, parseInt(qcowVCpus), parseInt(qcowVMemory), 
       qcowBridged ? 'Y' : 'N', qcowNetworkDevice, metaData, userData, networkConfig).then((response) =>
     {
-       setSpinnerSpinning(false);
-      if (response.ok)
-      {
-        addToast({ color: "primary", title: "VM Created"});
-        refreshVirtualMachineList();
-      }
-      else
-        console.log(response);
+      vmManagerContext?.setSpinnerState(false);
+      if (!response.ok) return vmManagerContext?.showErrorModal(response.jsonData.errorMessage);
+      addToast({ color: "primary", title: "VM Created"});
+      refreshVirtualMachineList();
     });
   }
 
   function callCreateQcowVmFromTemplate()
   {
-    setSpinnerText('Creating VM....');
-    setSpinnerSpinning(true);
+    vmManagerContext?.setSpinnerState(true, 'Creating VM....');
     createQcowVmFromTemplate(qcowVmImageName, qcowImage, parseInt(qcowOsVariantId as string), vmHostId, parseInt(qcowVCpus), parseInt(qcowVMemory), 
       qcowBridged ? 'Y' : 'N', qcowNetworkDevice, localhost, ip4Address, ip4Gateway, ip4Netmask, nameservers as NameserverT[], dnsSearch, sshKeys, 
       adminUser, adminPassword).then((response) =>
     {
-       setSpinnerSpinning(false);
-      if (response.ok)
-      {
-        addToast({ color: "primary", title: "VM Created"});
-        refreshVirtualMachineList();
-      }
-      else
-        console.log(response);
+      vmManagerContext?.setSpinnerState(false);
+      if (!response.ok) return vmManagerContext?.showErrorModal(response.jsonData.errorMessage);
+      addToast({ color: "primary", title: "VM Created"});
+      refreshVirtualMachineList();
     });
   }
 

@@ -9,6 +9,7 @@
 #define ORADATALAYER_H_
 
 extern int messageType;
+extern cJSON *messagePayload;
 
 int connectToDatabase(void);
 int disconnectFromDatabase(void);

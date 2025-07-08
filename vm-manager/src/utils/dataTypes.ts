@@ -32,10 +32,6 @@ export type SeedImagesT =
 
 export type SetIpCallbackT = (state: boolean) => void;
 
-export type SetSpinnerSpinning = React.Dispatch<React.SetStateAction<boolean>>;
-
-export type SetSpinnerText = React.Dispatch<React.SetStateAction<string>>;
-
 export type SshKeyT = 
 {
   id: number,

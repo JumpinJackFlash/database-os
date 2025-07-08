@@ -22,6 +22,41 @@ package body vm_manager as
 
   g_plugin_process                    json_object_t;
 
+  procedure send_message_to_host_monitor
+  (
+    p_message                         dbos$message_t)
+
+  as
+
+    l_enqueue_options                 DBMS_AQ.enqueue_options_t;
+    l_message_properties              DBMS_AQ.message_properties_t;
+    l_message_handle                  raw(16);
+    l_schema_owner                    varchar2(128);
+
+  begin
+
+    select  sys_context('USERENV', 'CURRENT_SCHEMA')
+      into  l_schema_owner
+      from  dual;
+
+    l_message_properties.expiration := MESSAGE_EXPIRATION;
+    l_enqueue_options.visibility := DBMS_AQ.IMMEDIATE;
+    l_enqueue_options.delivery_mode := DBMS_AQ.BUFFERED;
+    l_message_properties.delay := DBMS_AQ.NO_DELAY;
+
+    dbms_aq.enqueue(
+      queue_name => l_schema_owner||'.'||vm_manager.MESSAGE_QUEUE,
+      enqueue_options => l_enqueue_options,
+      message_properties => l_message_properties,
+      payload => p_message,
+      msgid => l_message_handle);
+
+  end send_message_to_host_monitor;
+
+---
+---
+---
+
   function get_cpu_count
   (
     p_host_id                         vm_hosts.host_id%type
@@ -156,37 +191,6 @@ package body vm_manager as
 
   end get_seed_images;
 
-  procedure send_message_to_host_monitor
-  (
-    p_message                         dbos$message_t)
-
-  as
-
-    l_enqueue_options                 DBMS_AQ.enqueue_options_t;
-    l_message_properties              DBMS_AQ.message_properties_t;
-    l_message_handle                  raw(16);
-    l_schema_owner                    varchar2(128);
-
-  begin
-
-    select  sys_context('USERENV', 'CURRENT_SCHEMA')
-      into  l_schema_owner
-      from  dual;
-
-    l_message_properties.expiration := MESSAGE_EXPIRATION;
-    l_enqueue_options.visibility := DBMS_AQ.IMMEDIATE;
-    l_enqueue_options.delivery_mode := DBMS_AQ.BUFFERED;
-    l_message_properties.delay := DBMS_AQ.NO_DELAY;
-
-    dbms_aq.enqueue(
-      queue_name => l_schema_owner||'.'||vm_manager.MESSAGE_QUEUE,
-      enqueue_options => l_enqueue_options,
-      message_properties => l_message_properties,
-      payload => p_message,
-      msgid => l_message_handle);
-
-  end send_message_to_host_monitor;
-
   procedure start_virtual_machine_action
   (
     p_session_id                      varchar2,
@@ -205,6 +209,9 @@ package body vm_manager as
     l_json_parameters                 json_object_t := json_object_t;
     l_object_id                       vault_objects.object_id%type;
     l_object_created                  vault_objects.object_created%type;
+    l_dbos_message                    dbos$message_t;
+    l_host_name                       vm_hosts.host_name%type;
+    l_status                          vm_hosts.status%type;
 
   begin
 
@@ -213,19 +220,30 @@ package body vm_manager as
       from  virtual_machines
      where  virtual_machine_id = p_virtual_machine_id;
 
+    select  host_name, status
+      into  l_host_name, l_status
+      from  vm_hosts
+     where  host_id = l_virtual_machine.host_id;
+
+    if 'online' != l_status then
+
+      raise_application_error(vm_manager.vm_host_offline, vm_manager.vm_host_offline_emsg);
+
+    end if;
+
     select  object_created
       into  l_object_created
       from  vault_objects
      where  object_id = l_virtual_machine.virtual_disk_id;
 
-    g_plugin_process := dbplugin_api.connect_to_plugin_server(PLUGIN_MODULE);                    -- Connect to the dbplugin_api.
+--    g_plugin_process := dbplugin_api.connect_to_plugin_server(PLUGIN_MODULE);                    -- Connect to the dbplugin_api.
 
     l_json_parameters.put('machineName', l_virtual_machine.machine_name);
 
     if l_virtual_machine.virtual_disk_id is not null then
 
       l_json_response := json_object_t(dgbunker_service.generate_object_filename(p_object_id => l_virtual_machine.virtual_disk_id,
-        p_gateway_name => g_plugin_process.get_string('pluginServer'), p_access_mode => dgbunker_service.READ_WRITE_ACCESS,
+        p_gateway_name => l_host_name, p_access_mode => dgbunker_service.READ_WRITE_ACCESS,
         p_linux_file_mode => VDISK_FILE_MODE, p_linux_subdir_mode => SUBDIR_FILE_MODE, p_disable_stream_write => 'Y',
         p_access_limit => dgbunker_service.unlimited_access_operations, p_valid_until => dgbunker_service.NO_EXPIRATION,
         p_file_user_group => ROOT_USER, p_subdir_user_group => ROOT_USER, p_session_id => p_session_id));
@@ -238,10 +256,6 @@ package body vm_manager as
 
       end if;
 
-    else
-
-      l_json_parameters.put('vDiskFilename', 'null');
-
     end if;
 
     if l_virtual_machine.virtual_cdrom_id is not null then
@@ -250,13 +264,9 @@ package body vm_manager as
         p_access_limit => dgbunker_service.UNLIMITED_ACCESS_OPERATIONS,
         p_valid_until => dgbunker_service.NO_EXPIRATION, p_access_mode => dgbunker_service.READ_ACCESS,
         p_linux_file_mode => VCDROM_FILE_MODE, p_linux_subdir_mode => SUBDIR_FILE_MODE, p_file_user_group => QEMU_USER, p_subdir_user_group => ROOT_USER,
-        p_gateway_name => g_plugin_process.get_string('pluginServer'), p_session_id => p_session_id));
+        p_gateway_name => l_host_name, p_session_id => p_session_id));
 
       l_json_parameters.put('vCdromFilename', l_json_response.get_string('filename'));
-
-    else
-
-      l_json_parameters.put('vCdromFilename', 'null');
 
     end if;
 
@@ -267,9 +277,8 @@ package body vm_manager as
     l_json_parameters.put('networkDevice', l_virtual_machine.network_device);
     l_json_parameters.put('bootDevice', p_boot_device);
 
-    l_json_response := dbplugin_api.call_plugin(g_plugin_process, 'startVirtualMachine', l_json_parameters);
-
-    dbplugin_api.disconnect_from_plugin_server(g_plugin_process);                 -- Disconnect from the plugin.
+    l_dbos_message := dbos$message_t(dbms_session.unique_session_id, l_host_name, vm_manager.START_VM_MESSAGE, l_json_parameters.to_string);
+    send_message_to_host_monitor(l_dbos_message);
 
     if 'Y' = p_remove_cdrom_after_first_boot and
        'Y' = p_first_boot and l_virtual_machine.virtual_cdrom_id is not null then
@@ -289,6 +298,7 @@ package body vm_manager as
   function create_cloud_init_cdrom_image
   (
     p_session_id                      varchar2,
+    p_host_name                       vm_hosts.host_name%type,
     p_machine_name                    virtual_machines.machine_name%type,
     p_meta_data                       clob,
     p_user_data                       clob,
@@ -312,6 +322,7 @@ package body vm_manager as
 
     l_json_response                   json_object_t;
     l_json_parameters                 json_object_t := json_object_t;
+    l_dbos_message                    dbos$message_t;
 
   begin
 
@@ -353,26 +364,24 @@ package body vm_manager as
 
     end if;
 
-    g_plugin_process := dbplugin_api.connect_to_plugin_server(PLUGIN_MODULE);                    -- Connect to the dbplugin_api.
-
 
     l_json_response := json_object_t(dgbunker_service.generate_object_filename(p_session_id => p_session_id, p_object_id => l_meta_data_id,
-        p_gateway_name => g_plugin_process.get_string('pluginServer'), p_access_mode => dgbunker_service.READ_ACCESS));
+        p_gateway_name => p_host_name, p_access_mode => dgbunker_service.READ_ACCESS));
     l_meta_data_filename := l_json_response.get_string('filename');
     l_json_response := json_object_t(dgbunker_service.generate_object_filename(p_session_id => p_session_id, p_object_id => l_user_data_id,
-        p_gateway_name => g_plugin_process.get_string('pluginServer'), p_access_mode => dgbunker_service.READ_ACCESS));
+        p_gateway_name => p_host_name, p_access_mode => dgbunker_service.READ_ACCESS));
     l_user_data_filename := l_json_response.get_string('filename');
 
     if p_network_config is not null then
 
       l_json_response := json_object_t(dgbunker_service.generate_object_filename(p_session_id => p_session_id, p_object_id => l_net_data_id,
-          p_gateway_name => g_plugin_process.get_string('pluginServer'), p_access_mode => dgbunker_service.READ_ACCESS));
+          p_gateway_name => p_host_name, p_access_mode => dgbunker_service.READ_ACCESS));
       l_net_data_filename := l_json_response.get_string('filename');
 
     end if;
 
     l_json_response := json_object_t(dgbunker_service.generate_object_filename(p_session_id => p_session_id, p_object_id => l_cdrom_id,
-        p_gateway_name => g_plugin_process.get_string('pluginServer'), p_access_mode => dgbunker_service.WRITE_ACCESS));
+        p_gateway_name => p_host_name, p_access_mode => dgbunker_service.WRITE_ACCESS));
     l_cdrom_filename := l_json_response.get_string('filename');
 
     commit;
@@ -388,9 +397,8 @@ package body vm_manager as
 
     l_json_parameters.put('vCdromFilename', l_cdrom_filename);
 
-    l_json_response := dbplugin_api.call_plugin(g_plugin_process, 'createCloudInitCdrom', l_json_parameters);
-
-    dbplugin_api.disconnect_from_plugin_server(g_plugin_process);                 -- Disconnect from the plugin.
+    l_dbos_message := dbos$message_t(dbms_session.unique_session_id, p_host_name, vm_manager.CREATE_CLOUD_INIT_CDROM_MESSAGE, l_json_parameters.to_string);
+    send_message_to_host_monitor(l_dbos_message);
 
     return l_cdrom_id;
 
@@ -400,6 +408,7 @@ package body vm_manager as
   (
     p_session_id                      varchar2,
     p_machine_name                    virtual_machines.machine_name%type,
+    p_host_name                       vm_hosts.host_name%type,
     p_local_hostname                  varchar2,
     p_user                            varchar2,
     p_password                        varchar2,
@@ -430,6 +439,7 @@ package body vm_manager as
 
     l_json_response                   json_object_t;
     l_json_parameters                 json_object_t := json_object_t;
+    l_dbos_message                    dbos$message_t;
 
   begin
 
@@ -519,27 +529,24 @@ package body vm_manager as
 
     end if;
 
-    g_plugin_process := dbplugin_api.connect_to_plugin_server(PLUGIN_MODULE);                    -- Connect to the dbplugin_api.
-
-
     l_json_response := json_object_t(dgbunker_service.generate_object_filename(p_session_id => p_session_id, p_object_id => l_meta_data_id,
-        p_gateway_name => g_plugin_process.get_string('pluginServer'), p_access_mode => dgbunker_service.READ_ACCESS));
+        p_gateway_name => p_host_name, p_access_mode => dgbunker_service.READ_ACCESS));
     l_meta_data_filename := l_json_response.get_string('filename');
 
     l_json_response := json_object_t(dgbunker_service.generate_object_filename(p_session_id => p_session_id, p_object_id => l_user_data_id,
-        p_gateway_name => g_plugin_process.get_string('pluginServer'), p_access_mode => dgbunker_service.READ_ACCESS));
+        p_gateway_name => p_host_name, p_access_mode => dgbunker_service.READ_ACCESS));
     l_user_data_filename := l_json_response.get_string('filename');
 
     if p_ip4_address is not null then
 
       l_json_response := json_object_t(dgbunker_service.generate_object_filename(p_session_id => p_session_id, p_object_id => l_net_data_id,
-          p_gateway_name => g_plugin_process.get_string('pluginServer'), p_access_mode => dgbunker_service.READ_ACCESS));
+          p_gateway_name => p_host_name, p_access_mode => dgbunker_service.READ_ACCESS));
       l_net_data_filename := l_json_response.get_string('filename');
 
     end if;
 
     l_json_response := json_object_t(dgbunker_service.generate_object_filename(p_session_id => p_session_id, p_object_id => l_cdrom_id,
-        p_gateway_name => g_plugin_process.get_string('pluginServer'), p_access_mode => dgbunker_service.WRITE_ACCESS));
+        p_gateway_name => p_host_name, p_access_mode => dgbunker_service.WRITE_ACCESS));
    l_cdrom_filename := l_json_response.get_string('filename');
 
     commit;
@@ -554,39 +561,10 @@ package body vm_manager as
 
     l_json_parameters.put('vCdromFilename', l_cdrom_filename);
 
-    l_json_response := dbplugin_api.call_plugin(g_plugin_process, 'createCloudInitCdrom', l_json_parameters);
-
-    dbplugin_api.disconnect_from_plugin_server(g_plugin_process);                 -- Disconnect from the plugin.
+    l_dbos_message := dbos$message_t(dbms_session.unique_session_id, p_host_name, vm_manager.CREATE_CLOUD_INIT_CDROM_MESSAGE, l_json_parameters.to_string);
+    send_message_to_host_monitor(l_dbos_message);
 
     return l_cdrom_id;
-
-  end create_cloud_init_cdrom_image;
-
-  function create_cloud_init_cdrom_image
-  (
-    p_session_id                      varchar2,
-    p_machine_name                    virtual_machines.machine_name%type,
-    p_meta_data_file                  vault_objects.object_id%type,
-    p_user_data_file                  vault_objects.object_id%type,
-    p_network_config_file             vault_objects.object_id%type
-  )
-  return vault_objects.object_id%type
-
-  is
-
-    l_meta_data_filename              varchar2(256);
-    l_user_data_filename              varchar2(256);
-    l_net_data_filename               varchar2(256);
-    l_cdrom_filename                  varchar2(256);
-
-    l_clob                            clob;
-
-    l_json_response                   json_object_t;
-    l_json_parameters                 json_object_t := json_object_t;
-
-  begin
-
-    null;
 
   end create_cloud_init_cdrom_image;
 
@@ -761,8 +739,21 @@ package body vm_manager as
     l_cdrom_id                        vault_objects.object_id%type;
     l_vdisk_id                        vault_objects.object_id%type;
     l_variant                         os_variants.variant%type;
+    l_host_name                       vm_hosts.host_name%type;
+    l_status                          vm_hosts.status%type;
 
   begin
+
+    select  host_name, status
+      into  l_host_name, l_status
+      from  vm_hosts
+     where  host_id = p_host_id;
+
+    if 'online' != l_status then
+
+      raise_application_error(vm_manager.vm_host_offline, vm_manager.vm_host_offline_emsg);
+
+    end if;
 
     if 'Y' = p_bridged_connection then
 
@@ -775,7 +766,7 @@ package body vm_manager as
       from  os_variants
      where  variant_id = p_os_variant_id;
 
-    l_cdrom_id := create_cloud_init_cdrom_image(p_session_id, p_machine_name, p_meta_data, p_user_data, p_network_config);
+    l_cdrom_id := create_cloud_init_cdrom_image(p_session_id, p_machine_name, l_host_name, p_meta_data, p_user_data, p_network_config);
     l_vdisk_id := create_virtual_disk_from_seed(p_session_id, p_machine_name||'.qcow2', p_seed_image_id);
 
     insert into virtual_machines
@@ -821,8 +812,21 @@ package body vm_manager as
     l_cdrom_id                        vault_objects.object_id%type;
     l_vdisk_id                        vault_objects.object_id%type;
     l_variant                         os_variants.variant%type;
+    l_host_name                       vm_hosts.host_name%type;
+    l_status                          vm_hosts.status%type;
 
   begin
+
+    select  host_name, status
+      into  l_host_name, l_status
+      from  vm_hosts
+     where  host_id = p_host_id;
+
+    if 'online' != l_status then
+
+      raise_application_error(vm_manager.vm_host_offline, vm_manager.vm_host_offline_emsg);
+
+    end if;
 
     if 'Y' = p_bridged_connection then
 
@@ -835,7 +839,7 @@ package body vm_manager as
       from  os_variants
      where  variant_id = p_os_variant_id;
 
-    l_cdrom_id := create_cloud_init_cdrom_image(p_session_id, p_machine_name, p_local_hostname, p_user, p_password, p_ssh_keys,
+    l_cdrom_id := create_cloud_init_cdrom_image(p_session_id, p_machine_name, l_host_name, p_local_hostname, p_user, p_password, p_ssh_keys,
       p_ip4_address, p_ip4_gateway, p_ip4_netmask, p_nameservers, p_dns_search);
     l_vdisk_id := create_virtual_disk_from_seed(p_session_id, p_machine_name||'.qcow2', p_seed_image_id);
 
@@ -1124,7 +1128,9 @@ package body vm_manager as
 
     l_virtual_machine                 virtual_machines%rowtype;
     l_json_parameters                 json_object_t := json_object_t;
-    l_json_response                   json_object_t;
+    l_host_name                       vm_hosts.host_name%type;
+    l_status                          vm_hosts.status%type;
+    l_dbos_message                    dbos$message_t;
 
   begin
 
@@ -1137,10 +1143,21 @@ package body vm_manager as
        set  lifecycle_state = 'stopping'
      where  virtual_machine_id = p_virtual_machine_id;
 
-    g_plugin_process := dbplugin_api.connect_to_plugin_server(PLUGIN_MODULE);                    -- Connect to the dbplugin_api.
+    select  host_name, status
+      into  l_host_name, l_status
+      from  vm_hosts
+     where  host_id = l_virtual_machine.host_id;
+
+    if 'online' != l_status then
+
+      raise_application_error(vm_manager.vm_host_offline, vm_manager.vm_host_offline_emsg);
+
+    end if;
+
     l_json_parameters.put('machineName', l_virtual_machine.machine_name);
-    l_json_response := dbplugin_api.call_plugin(g_plugin_process, 'stopVirtualMachine', l_json_parameters);
-    dbplugin_api.disconnect_from_plugin_server(g_plugin_process);                 -- Disconnect from the plugin.
+
+    l_dbos_message := dbos$message_t(dbms_session.unique_session_id, l_host_name, vm_manager.STOP_VM_MESSAGE, l_json_parameters.to_string);
+    send_message_to_host_monitor(l_dbos_message);
 
   end stop_virtual_machine;
 
@@ -1153,7 +1170,9 @@ package body vm_manager as
 
     l_virtual_machine                 virtual_machines%rowtype;
     l_json_parameters                 json_object_t := json_object_t;
-    l_json_response                   json_object_t;
+    l_host_name                       vm_hosts.host_name%type;
+    l_status                          vm_hosts.status%type;
+    l_dbos_message                    dbos$message_t;
 
   begin
 
@@ -1162,10 +1181,21 @@ package body vm_manager as
       from  virtual_machines
      where  virtual_machine_id = p_virtual_machine_id;
 
-    g_plugin_process := dbplugin_api.connect_to_plugin_server(PLUGIN_MODULE);                    -- Connect to the dbplugin_api.
+    select  host_name, status
+      into  l_host_name, l_status
+      from  vm_hosts
+     where  host_id = l_virtual_machine.host_id;
+
+    if 'online' != l_status then
+
+      raise_application_error(vm_manager.vm_host_offline, vm_manager.vm_host_offline_emsg);
+
+    end if;
+
     l_json_parameters.put('machineName', l_virtual_machine.machine_name);
-    l_json_response := dbplugin_api.call_plugin(g_plugin_process, 'undefineVirtualMachine', l_json_parameters);
-    dbplugin_api.disconnect_from_plugin_server(g_plugin_process);                 -- Disconnect from the plugin.
+
+    l_dbos_message := dbos$message_t(dbms_session.unique_session_id, l_host_name, vm_manager.UNDEFINE_VM_MESSAGE, l_json_parameters.to_string);
+    send_message_to_host_monitor(l_dbos_message);
 
   end undefine_virtual_machine;
 

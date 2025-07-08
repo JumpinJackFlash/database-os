@@ -8,6 +8,13 @@ as
   MESSAGE_EXPIRATION                  constant pls_integer := 5;
   MESSAGE_QUEUE                       constant varchar2(17) := 'dbos$vm_monitor_q';
 
+-- These values are tied to the message types handled by the vmHostMonitor (vmHostMonitorDefs.h)
+
+  START_VM_MESSAGE                    constant pls_integer := 20;
+  STOP_VM_MESSAGE                     constant pls_integer := 25;
+  UNDEFINE_VM_MESSAGE                 constant pls_integer := 30;
+  CREATE_CLOUD_INIT_CDROM_MESSAGE     constant pls_integer := 35;
+
 -- Error codes and messages. DbTwig has reserved -20000 to -20199. Start with -20200
 
   UNAUTHORIZED_VM_DETECTED            constant pls_integer := -20200;
@@ -16,7 +23,10 @@ as
   VM_STATE_MISMATCH                   constant pls_integer := -20201;
   VM_STATE_MISMATCH_EMSG              constant varchar2(33) := 'A VM state mismatch was detected.';
 
-  function create_cloud_init_cdrom_image
+  VM_HOST_OFFLINE                     constant pls_integer := -20202;
+  VM_HOST_OFFLINE_EMSG                constant varchar2(62) := 'Assigned host server for specified virtual machine is offline.';
+
+/*  function create_cloud_init_cdrom_image
   (
     p_session_id                      varchar2,
     p_machine_name                    virtual_machines.machine_name%type,
@@ -50,7 +60,7 @@ as
     p_user_data                       clob,
     p_network_config                  clob
   )
-  return vault_objects.object_id%type;
+  return vault_objects.object_id%type; */
 
   procedure create_dbos_service;
 

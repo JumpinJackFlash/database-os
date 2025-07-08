@@ -2,21 +2,20 @@
 
 import { startVirtualMachine, stopVirtualMachine, deleteVirtualMachine, undefineVirtualMachine } from "@/utils/serverFunctions";
 import { Checkbox,  Button } from "@heroui/react";
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useContext } from "react";
 import { Table,  TableHeader,  TableBody,  TableColumn,  TableRow,  TableCell } from "@heroui/table";
-import { VirtualMachinesT, SetSpinnerSpinning, SetSpinnerText, RefreshVirtualMachineListT } from "@/utils/dataTypes";
+import { VirtualMachinesT, RefreshVirtualMachineListT } from "@/utils/dataTypes";
 import { addToast } from "@heroui/react";
 import {  Modal,  ModalContent,  ModalHeader,  ModalBody,  ModalFooter, useDisclosure } from "@heroui/modal";
+import { VmManagerContext } from "@/utils/vmManagerContext";
 
 interface VirtualMachinePropsI 
 {
   vmImages: VirtualMachinesT;
-  setSpinnerSpinning: SetSpinnerSpinning;
-  setSpinnerText: SetSpinnerText;
   refreshVirtualMachineList: RefreshVirtualMachineListT
 };
 
-export default function VirtualMachines({ vmImages, setSpinnerSpinning, setSpinnerText, refreshVirtualMachineList }: VirtualMachinePropsI) 
+export default function VirtualMachines({ vmImages, refreshVirtualMachineList }: VirtualMachinePropsI) 
 {
   const {isOpen, onOpen, onOpenChange} = useDisclosure();
 
@@ -33,6 +32,8 @@ export default function VirtualMachines({ vmImages, setSpinnerSpinning, setSpinn
 
   type VirtualMachineT = (typeof vmImages)[0];
 
+  const vmManagerContext = useContext(VmManagerContext);
+
   function confirmDeleteVM(virtualMachine: VirtualMachineT)
   {
     setDeleteVmConfirmed(false);
@@ -43,23 +44,15 @@ export default function VirtualMachines({ vmImages, setSpinnerSpinning, setSpinn
 
   function deleteVM(onClose: Function, action: string)
   {
-    setSpinnerText('Deleting VM....');
-    setSpinnerSpinning(true);
+    vmManagerContext?.setSpinnerState(true, 'Deleting VM....');
     if ('confirmed' === action && undefined !== deleteThisVM)
     {
       deleteVirtualMachine(deleteThisVM?.virtualMachineId, deleteBootDiskConfirmed).then((response) =>
       {
-        if (response.ok)
-        { 
-          addToast({ color: "primary", title: "VM Deleted"});
-          refreshVirtualMachineList();
-        }
-        else
-        {
-          console.log(response);
-        }
-
-        setSpinnerSpinning(false);
+        vmManagerContext?.setSpinnerState(false);
+        if (!response.ok) return vmManagerContext?.showErrorModal(response.jsonData.errorMessage);
+        addToast({ color: "primary", title: "VM Deleted"});
+        refreshVirtualMachineList();
         onClose();
       });
     }
@@ -88,25 +81,23 @@ export default function VirtualMachines({ vmImages, setSpinnerSpinning, setSpinn
 
   function startVirtualMachineHandler(virtualMachineId: number)
   {
-    setSpinnerText('Starting VM....');
-    setSpinnerSpinning(true);
+    vmManagerContext?.setSpinnerState(true, 'Starting VM....');
     startVirtualMachine(virtualMachineId).then((response) =>
     {
-      if (response.ok) addToast({ title: "VM Started", color: 'primary' });
-      setSpinnerSpinning(false);
-      console.log(response);
+      vmManagerContext?.setSpinnerState(false);
+      if (!response.ok) return vmManagerContext?.showErrorModal(response.jsonData.errorMessage);
+      addToast({ title: "VM Started", color: 'primary' });
     })
   }
 
   function stopVirtualMachineHandler(virtualMachineId: number)
   {
-    setSpinnerText('Stopping VM....');
-    setSpinnerSpinning(true);
+    vmManagerContext?.setSpinnerState(true, 'Stopping VM....');
     stopVirtualMachine(virtualMachineId).then((response) =>
     {
-      if (response.ok) addToast({ color: 'primary', title: "VM Stopped" });
-      setSpinnerSpinning(false);
-      console.log(response);
+      vmManagerContext?.setSpinnerState(false);
+      if (!response.ok) return vmManagerContext?.showErrorModal(response.jsonData.errorMessage);
+      addToast({ color: 'primary', title: "VM Stopped" });
     })
   }
 
@@ -114,8 +105,8 @@ export default function VirtualMachines({ vmImages, setSpinnerSpinning, setSpinn
   {
     undefineVirtualMachine(virtualMachineId).then((response) =>
     {
-      if (response.ok) addToast({ color: 'primary', title: "VM Undefined" });
-      console.log(response);
+      if (!response.ok) return vmManagerContext?.showErrorModal(response.jsonData.errorMessage);
+      addToast({ color: 'primary', title: "VM Undefined" });
     })
   }
 

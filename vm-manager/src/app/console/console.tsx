@@ -9,6 +9,8 @@ import { useRouter } from "next/navigation";
 import React, { useState } from "react";
 import { OsVariantsT, SeedImagesT, VirtualMachinesT, VmHostsT } from "@/utils/dataTypes";
 import {Spinner} from "@heroui/spinner";
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure} from "@heroui/modal";
+import { VmManagerContext } from "@/utils/vmManagerContext";
 
 interface ConsolePropsI 
 {
@@ -25,6 +27,9 @@ export default function Console({ osVariants, isoImages, qcow2Images, vmImages, 
 
   const [ spinnerSpinning, setSpinnerSpinning ] = useState(false);
   const [ spinnerText, setSpinnerText ] = useState('');
+
+  const {isOpen, onOpen, onOpenChange} = useDisclosure();
+  const [ errorMessage, setErrorMessage ] = useState('');
 
   const router = useRouter();
   
@@ -49,10 +54,42 @@ export default function Console({ osVariants, isoImages, qcow2Images, vmImages, 
     }); 
   }
 
-  console.log(vmHosts);
+  function setSpinnerState(spinning: boolean, spinnerText?: string)
+  {
+    setSpinnerSpinning(spinning);
+    if (undefined !== spinnerText) setSpinnerText(spinnerText);
+  }
+
+  function showErrorModal(errorMessage: string)
+  {
+    setErrorMessage(errorMessage);
+    onOpen();
+  }
+
+  let contextValue = { setSpinnerState: setSpinnerState, showErrorModal: showErrorModal }
 
   return (
-    <>
+    <VmManagerContext.Provider value={contextValue}>
+      <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="lg">
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader className="flex flex-col gap-1">API Error</ModalHeader>
+              <ModalBody>
+                <p>{errorMessage}</p>
+              </ModalBody>
+              <ModalFooter>
+                <Button color="danger" variant="light" onPress={onClose}>
+                  Close
+                </Button>
+                <Button color="primary" onPress={onClose}>
+                  Action
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>                
       { spinnerSpinning &&
         <div style={{position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)"}}>
           <Spinner color="primary" label={spinnerText} />
@@ -60,16 +97,15 @@ export default function Console({ osVariants, isoImages, qcow2Images, vmImages, 
       }
       <div className=" max-w-screen-md flex-col gap-4 rounded-large px-8 pb-10 pt-6">
         <div className=" max-w-screen-md flex-col gap-4 rounded-large px-8 pb-10 pt-6">
-          <VirtualMachines vmImages={virtualMachines} refreshVirtualMachineList={refreshVirtualMachineList} setSpinnerSpinning={setSpinnerSpinning} setSpinnerText={setSpinnerText} />
+          <VirtualMachines vmImages={virtualMachines} refreshVirtualMachineList={refreshVirtualMachineList} />
           <Divider className="m-4 max-w-screen-md" />
-          <CreateVM osVariants={osVariants} qcow2Images={qcow2Images} isoImages={isoImages} refreshVirtualMachineList={refreshVirtualMachineList} 
-            setSpinnerSpinning={setSpinnerSpinning} setSpinnerText={setSpinnerText} vmHosts={vmHosts}/>
+          <CreateVM osVariants={osVariants} qcow2Images={qcow2Images} isoImages={isoImages} refreshVirtualMachineList={refreshVirtualMachineList} vmHosts={vmHosts}/>
           <Divider className="m-4 max-w-screen-md" />
           <div>
             <Button color="primary" type="button" onPress={logout}>Log Out...</Button>
           </div>
         </div>
       </div>
-    </>
+    </VmManagerContext.Provider>
   );
 }

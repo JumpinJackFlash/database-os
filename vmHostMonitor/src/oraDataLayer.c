@@ -24,8 +24,9 @@ static OCI_SESSION qSess;
 static OCI_SESSION dbSess;
 
 static char jsonParametersStr[16384];
-
 static char jsonResultStr[8192];
+static char queueParms[8192];
+static char queueData[8192];
 
 static char *callApiTxt = "begin :jsonResult := vm_manager_runtime.call_api(:jsonParameters); end;";
 
@@ -35,11 +36,13 @@ static OCIStmt *qConnStmt = NULL;
 static OCIBind *jsonParmsBV = NULL;
 static OCIBind *jsonResultBV = NULL;
 
+static OCIBind *queueParmsBV = NULL;
+static OCIBind *queueDataBV = NULL;
+
 static sb4 oraErrorCode = OCI_SUCCESS;
 
 char clientHandle[CLIENT_HANDLE_LENGTH];
-int messageType;
-
+cJSON *messagePayload;
 int messageType;
 
 static int errorHandler(int rc, OCIError *error)
@@ -59,9 +62,22 @@ int oraReturnCode = E_SUCCESS;
   return rc;
 }
 
+static int reEstablishQueueConnection(void)
+{
+int rc = E_SUCCESS;
+
+  rc = getSessionFromSPool(&dbConn, &qSess);
+  if (rc) return errorHandler(rc, NULL);
+
+  logOutput(LOG_OUTPUT_WARN, "Queue connection re-established.");
+
+  return rc;
+}
+
 int connectToDatabase(void)
 {
 int rc = E_SUCCESS;
+cJSON *jsonParms = NULL, *item = NULL;
 
   logOutput(LOG_OUTPUT_ALWAYS, "Connecting to the database...");
 
@@ -102,6 +118,29 @@ int rc = E_SUCCESS;
   rc = OCIStmtPrepare2(qSess.oraSvcCtx, &qConnStmt, qSess.oraError, (const OraText *)callApiTxt,
     (ub4) strlen(callApiTxt), (const OraText *) NULL, (ub4) 0, OCI_NTV_SYNTAX, OCI_DEFAULT);
   if (rc) return errorHandler(rc, qSess.oraError);
+
+  jsonParms = cJSON_CreateObject();
+  if (!jsonParms) return E_JSON_ERROR;
+  item = cJSON_AddStringToObject(jsonParms, "entryPoint", "getMessageForHostMonitor");
+  if (!item) return E_JSON_ERROR;
+
+
+  item = cJSON_AddStringToObject(jsonParms, "hostName", hostName);
+  if (!item) return E_JSON_ERROR;
+
+  rc = cJSON_PrintPreallocated(jsonParms, queueParms, sizeof(queueParms), 0);
+  if (!rc) return E_MALLOC;
+
+  if (jsonParms) cJSON_Delete(jsonParms);
+
+  rc = OCIBindByName(qConnStmt, &queueParmsBV, qSess.oraError, (const OraText *)":jsonParameters", -1,
+    queueParms, (ub4) strlen(queueParms)+1, SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0,
+    (ub4 *) 0, (sb4) OCI_DEFAULT);
+
+  rc = OCIBindByName(qConnStmt, &queueDataBV, qSess.oraError, (const OraText *)":jsonResult", -1,
+    queueData, (ub4) sizeof(queueData)-1, SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0,
+    (ub4 *) 0, (sb4) OCI_DEFAULT);
+  if (rc) return errorHandler(rc, dbSess.oraError);
 
   return rc;
 }
@@ -244,14 +283,13 @@ cJSON *item = NULL, *jsonData = NULL;
 
 retry:
 
-/*  bzero(clientHandle, sizeof(clientHandle));
+  bzero(clientHandle, sizeof(clientHandle));
   messageType = 0;
-  bzero(messagePayload, sizeof(messagePayload));
 
-  rc = OCIStmtExecute(dqCtx.dbCtx.dbSession.oraSvcCtx, dqCtx.callApi, dqCtx.dbCtx.dbSession.oraError, 1, 0, NULL, NULL, OCI_DEFAULT);
+  rc = OCIStmtExecute(qSess.oraSvcCtx, qConnStmt, qSess.oraError, 1, 0, NULL, NULL, OCI_DEFAULT);
   if (rc && OCI_SUCCESS_WITH_INFO != rc && OCI_NO_DATA != rc)
   {
-    serverOraErrorHandler(rc, dqCtx.dbCtx.dbSession.oraError);
+    errorHandler(rc, qSess.oraError);
 
     if (OCI_QUEUE_TIMEOUT == oraErrorCode) goto retry;
 
@@ -269,7 +307,7 @@ retry:
     return(E_FATAL_QUEUE_ERROR);
   }
 
-  jsonData = cJSON_Parse(dqCtx.dbCtx.jsonDataStr);
+  jsonData = cJSON_Parse(queueData);
 
   rc = E_JSON_ERROR;
 
@@ -282,14 +320,21 @@ retry:
   messageType = item->valueint;
 
   item = cJSON_GetObjectItemCaseSensitive(jsonData, "messagePayload");
-  if (!item) goto exit_point;
-  strncpy(messagePayload, item->valuestring, sizeof(messagePayload) - 1);
+  if (item && !cJSON_IsNull(item))
+  {
+    messagePayload = cJSON_Parse(item->valuestring);
+    if (!messagePayload)
+    {
+      rc = jsonError("Unable to create messagePayload object.");
+      goto exit_point;
+    }
+  }
 
   rc = E_SUCCESS;
 
 exit_point:
 
-  if (jsonData) cJSON_Delete(jsonData); */
+  if (jsonData) cJSON_Delete(jsonData);
   return rc;
 }
 
@@ -297,12 +342,11 @@ int breakDqSession(void)
 {
 int rc = E_SUCCESS;
 
-/*  OCIBreak(dqCtx.dbCtx.dbSession.oraSvcCtx, dqCtx.dbCtx.dbSession.oraError);
-  if (rc) serverOraErrorHandler(rc, dqCtx.dbCtx.dbSession.oraError);
+  OCIBreak(qSess.oraSvcCtx, qSess.oraError);
+  if (rc) errorHandler(rc, qSess.oraError);
 
-  OCIReset(dqCtx.dbCtx.dbSession.oraSvcCtx, dqCtx.dbCtx.dbSession.oraError);
-  if (rc) serverOraErrorHandler(rc, dqCtx.dbCtx.dbSession.oraError); */
+  OCIReset(qSess.oraSvcCtx, qSess.oraError);
+  if (rc) errorHandler(rc, qSess.oraError);
 
   return E_SUCCESS;
 }
-
