@@ -10,6 +10,7 @@
 
 extern int messageType;
 extern cJSON *messagePayload;
+extern cJSON *responsePayload;
 
 int connectToDatabase(void);
 int disconnectFromDatabase(void);
@@ -17,6 +18,8 @@ void closeStatementHandles(void);
 int registerVmHost(char *sysInfo, char *hostCapabilities, unsigned long hypervisorVersion, unsigned long libvirtVersion,
   char *osRelease, char *machineType);
 int setVmHostOffline(void);
+int sendMessageToClient(void);
+int updateLifecycleState(char *machineName, char *lifecycleState);
 int validateVmState(void *jsonParms);
 int getMsgForVmHostMonitor(void);
 int breakDqSession(void);

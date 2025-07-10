@@ -79,10 +79,10 @@ alter table virtual_machines drop column assigned_to_host;
 
 alter table virtual_machines add host_id number(7) references vm_hosts(host_id);
 alter table virtual_machines add uuid varchar2(36) unique;
-alter table virtual_machines add persistent varchar2(1) constraint persistent_chk check (persistent in ('Y', 'N'));
+alter table virtual_machines add persistent varchar2(1) default 'N' not null constraint persistent_chk check (persistent in ('Y', 'N'));
 alter table virtual_machines add ip_addresses clob constraint ip_addresses_chk check(ip_addresses is json);
 alter table virtual_machines add lifecycle_state varchar2(11) default 'stopped' not null
-  constraint lifecycle_state_chk check (lifecycle_state in ('unknown', 'starting', 'started', 'blocked', 'pausing', 'paused', 'stopping', 'stopped', 'crashed', 'pmsuspended'));
+  constraint lifecycle_state_chk check (lifecycle_state in ('unknown', 'start', 'starting', 'running', 'blocked', 'pausing', 'paused', 'stop', 'stopping', 'stopped', 'crashed', 'pmsuspended'));
 
 
 REM  ...and here

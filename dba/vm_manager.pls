@@ -20,7 +20,39 @@ package body vm_manager as
   ROOT_USER                           constant varchar2(9) := 'root:root';
   QEMU_USER                           constant varchar2(9) := 'qemu:qemu';
 
-  g_plugin_process                    json_object_t;
+  function get_message_for_client
+  (
+    p_timeout                         pls_integer default 60
+  )
+  return json_object_t
+
+  is
+
+    l_rc                              pls_integer;
+    l_dequeue_options                 DBMS_AQ.dequeue_options_t;
+    l_message_properties              DBMS_AQ.message_properties_t;
+    l_message_handle                  raw(16);
+    l_payload                         dbos$message_t;
+    l_json_response                   json_object_t := json_object_t;
+
+  begin
+
+    l_dequeue_options.wait := p_timeout;
+    l_dequeue_options.navigation := DBMS_AQ.FIRST_MESSAGE;
+    l_dequeue_options.visibility := DBMS_AQ.IMMEDIATE;
+    l_dequeue_options.delivery_mode := DBMS_AQ.BUFFERED;
+    l_dequeue_options.deq_condition := 'tab.user_data.client_handle = '''||dbms_session.unique_session_id||''' and tab.user_data.message_type = '||vm_manager.HOST_MONITOR_REPLY_MESSAGE;
+
+    dbms_aq.dequeue(queue_name => vm_manager.MESSAGE_QUEUE, dequeue_options => l_dequeue_options,
+      message_properties => l_message_properties, payload => l_payload, msgid => l_message_handle);
+
+    l_json_response.put('hostName', l_payload.host_name);
+    l_json_response.put('messageType', l_payload.message_type);
+    l_json_response.put('messagePayload', json_object_t(l_payload.message_payload));
+
+    return l_json_response;
+
+  end get_message_for_client;
 
   procedure send_message_to_host_monitor
   (
@@ -321,6 +353,7 @@ package body vm_manager as
     l_clob                            clob;
 
     l_json_response                   json_object_t;
+    l_message_payload                 json_object_t;
     l_json_parameters                 json_object_t := json_object_t;
     l_dbos_message                    dbos$message_t;
 
@@ -364,7 +397,6 @@ package body vm_manager as
 
     end if;
 
-
     l_json_response := json_object_t(dgbunker_service.generate_object_filename(p_session_id => p_session_id, p_object_id => l_meta_data_id,
         p_gateway_name => p_host_name, p_access_mode => dgbunker_service.READ_ACCESS));
     l_meta_data_filename := l_json_response.get_string('filename');
@@ -399,6 +431,15 @@ package body vm_manager as
 
     l_dbos_message := dbos$message_t(dbms_session.unique_session_id, p_host_name, vm_manager.CREATE_CLOUD_INIT_CDROM_MESSAGE, l_json_parameters.to_string);
     send_message_to_host_monitor(l_dbos_message);
+
+    l_json_response := get_message_for_client;
+    l_message_payload := l_json_response.get_object('messagePayload');
+
+    if 'success' != l_message_payload.get_string('status') then
+
+      raise_application_error(-20000, l_message_payload.to_clob);
+
+    end if;
 
     return l_cdrom_id;
 
@@ -438,6 +479,7 @@ package body vm_manager as
     l_clob                            clob;
 
     l_json_response                   json_object_t;
+    l_message_payload                 json_object_t;
     l_json_parameters                 json_object_t := json_object_t;
     l_dbos_message                    dbos$message_t;
 
@@ -521,7 +563,11 @@ package body vm_manager as
 
       end loop;
 
-      l_content := l_content||'        dns_search:'||chr(10)||'          - '||p_dns_search||chr(10);
+      if p_dns_search is not null and '' != p_dns_search then
+
+        l_content := l_content||'        dns_search:'||chr(10)||'          - '||p_dns_search||chr(10);
+
+      end if;
 
       l_clob := dgbunker_service.get_clob_locator(p_object_id => l_net_data_id, p_for_update => dgbunker_service.OPTION_ENABLED);
       dgbunker_service.set_clob_value(l_net_data_id, l_content);
@@ -563,6 +609,15 @@ package body vm_manager as
 
     l_dbos_message := dbos$message_t(dbms_session.unique_session_id, p_host_name, vm_manager.CREATE_CLOUD_INIT_CDROM_MESSAGE, l_json_parameters.to_string);
     send_message_to_host_monitor(l_dbos_message);
+
+    l_json_response := get_message_for_client;
+    l_message_payload := l_json_response.get_object('messagePayload');
+
+    if 'success' != l_message_payload.get_string('status') then
+
+      raise_application_error(-20000, l_message_payload.to_clob);
+
+    end if;
 
     return l_cdrom_id;
 
@@ -706,7 +761,7 @@ package body vm_manager as
        network_source, network_device, host_id, lifecycle_state)
     values
       (id_seq.nextval, p_machine_name, l_object_id, p_iso_image_id, p_vcpu_count, p_virtual_memory * 1024,
-       l_variant, l_network_source, p_network_device, p_host_id, 'starting')
+       l_variant, l_network_source, p_network_device, p_host_id, 'start')
     returning virtual_machine_id into l_virtual_machine_id;
 
     start_virtual_machine_action(p_session_id => p_session_id, p_virtual_machine_id => l_virtual_machine_id, p_virtual_disk_size => p_virtual_disk_size,
@@ -774,7 +829,7 @@ package body vm_manager as
        network_source, network_device, host_id, lifecycle_state)
     values
       (id_seq.nextval, p_machine_name, l_vdisk_id, l_cdrom_id, p_vcpu_count, p_virtual_memory * 1024,
-       l_variant, l_network_source, p_network_device, p_host_id, 'starting')
+       l_variant, l_network_source, p_network_device, p_host_id, 'start')
     returning virtual_machine_id into l_virtual_machine_id;
 
     start_virtual_machine_action(p_session_id => p_session_id, p_virtual_machine_id => l_virtual_machine_id, p_boot_device => 'hd',
@@ -848,7 +903,7 @@ package body vm_manager as
        network_source, network_device, host_id, lifecycle_state)
     values
       (id_seq.nextval, p_machine_name, l_vdisk_id, l_cdrom_id, p_vcpu_count, p_virtual_memory * 1024,
-       l_variant, l_network_source, p_network_device, p_host_id, 'starting')
+       l_variant, l_network_source, p_network_device, p_host_id, 'start')
     returning virtual_machine_id into l_virtual_machine_id;
 
     start_virtual_machine_action(p_session_id => p_session_id, p_virtual_machine_id => l_virtual_machine_id, p_boot_device => 'hd',
@@ -1112,7 +1167,7 @@ package body vm_manager as
   begin
 
     update  virtual_machines
-       set  lifecycle_state = 'starting'
+       set  lifecycle_state = 'start'
      where  virtual_machine_id = p_virtual_machine_id;
 
     start_virtual_machine_action(p_session_id => p_session_id, p_virtual_machine_id => p_virtual_machine_id, p_boot_device => p_boot_device);
@@ -1140,7 +1195,7 @@ package body vm_manager as
      where  virtual_machine_id = p_virtual_machine_id;
 
     update  virtual_machines
-       set  lifecycle_state = 'stopping'
+       set  lifecycle_state = 'stop'
      where  virtual_machine_id = p_virtual_machine_id;
 
     select  host_name, status

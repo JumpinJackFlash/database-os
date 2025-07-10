@@ -27,6 +27,42 @@ static int vmHostErrorHandler(void)
   return E_LIBVIRT_ERROR;
 }
 
+static char *decodeEvent(int event)
+{
+  switch (event)
+  {
+    case VIR_DOMAIN_EVENT_DEFINED:
+      return "defined";
+
+    case VIR_DOMAIN_EVENT_UNDEFINED:
+      return "undefined";
+
+    case VIR_DOMAIN_EVENT_STARTED:
+      return "started";
+
+    case VIR_DOMAIN_EVENT_SUSPENDED:
+      return "suspended";
+
+    case VIR_DOMAIN_EVENT_RESUMED:
+      return "resumed";
+
+    case VIR_DOMAIN_EVENT_STOPPED:
+      return "stopped";
+
+    case VIR_DOMAIN_EVENT_SHUTDOWN:
+      return "shutdown";
+
+    case VIR_DOMAIN_EVENT_PMSUSPENDED:
+      return "pmsuspended";
+
+    case VIR_DOMAIN_EVENT_CRASHED:
+      return "crashed";
+
+    default:
+      return "unknown";
+  }
+}
+
 static char *decodeState(int state)
 {
   switch (state)
@@ -187,7 +223,7 @@ struct sigaction sigAction;
 
   sigemptyset(&mask);
   sigaddset(&mask, SIGTERM);
-  sigaddset(&mask, SIGINT);
+//  sigaddset(&mask, SIGINT);
   sigaddset(&mask, SIGQUIT);
   sigaddset(&mask, SIGABRT);
 
@@ -245,7 +281,11 @@ const char *domainName = NULL;
 
   domainName = virDomainGetName(domain);
   logOutput(LOG_OUTPUT_ALWAYS, (char *) domainName);
-  return 0;
+  logOutput(LOG_OUTPUT_ALWAYS, (char *) decodeEvent(event));
+
+  if (VIR_DOMAIN_EVENT_STARTED == event) updateLifecycleState((char *) domainName, "starting");
+
+  return E_SUCCESS;
 }
 
 int setupEventLoop(void)

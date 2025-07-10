@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <pthread.h>
+
 #include <oci.h>
 
 #include <cjson/cJSON.h>
@@ -28,7 +30,7 @@ static char jsonResultStr[8192];
 static char queueParms[8192];
 static char queueData[8192];
 
-static char *callApiTxt = "begin :jsonResult := vm_manager_runtime.call_api(:jsonParameters); end;";
+static char *callApiTxt = "begin :jsonResult := vm_manager_runtime.call_api(:hostName, :jsonParameters); end;";
 
 static OCIStmt *dbConnStmt = NULL;
 static OCIStmt *qConnStmt = NULL;
@@ -39,10 +41,15 @@ static OCIBind *jsonResultBV = NULL;
 static OCIBind *queueParmsBV = NULL;
 static OCIBind *queueDataBV = NULL;
 
+static OCIBind *hostNameBV = NULL;
+
 static sb4 oraErrorCode = OCI_SUCCESS;
 
+static pthread_mutex_t dbConnMtx;
+
 char clientHandle[CLIENT_HANDLE_LENGTH];
-cJSON *messagePayload;
+cJSON *messagePayload = NULL;
+cJSON *responsePayload = NULL;
 int messageType;
 
 static int errorHandler(int rc, OCIError *error)
@@ -110,6 +117,11 @@ cJSON *jsonParms = NULL, *item = NULL;
     (ub4) strlen(callApiTxt), (const OraText *) NULL, (ub4) 0, OCI_NTV_SYNTAX, OCI_DEFAULT);
   if (rc) return errorHandler(rc, dbSess.oraError);
 
+  rc = OCIBindByName(dbConnStmt, &hostNameBV, dbSess.oraError, (const OraText *)":hostName", -1,
+    hostName, (ub4) sizeof(hostName)-1, SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0,
+    (ub4 *) 0, (sb4) OCI_DEFAULT);
+  if (rc) return errorHandler(rc, dbSess.oraError);
+
   rc = OCIBindByName(dbConnStmt, &jsonResultBV, dbSess.oraError, (const OraText *)":jsonResult", -1,
     jsonResultStr, (ub4) sizeof(jsonResultStr)-1, SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0,
     (ub4 *) 0, (sb4) OCI_DEFAULT);
@@ -124,14 +136,15 @@ cJSON *jsonParms = NULL, *item = NULL;
   item = cJSON_AddStringToObject(jsonParms, "entryPoint", "getMessageForHostMonitor");
   if (!item) return E_JSON_ERROR;
 
-
-  item = cJSON_AddStringToObject(jsonParms, "hostName", hostName);
-  if (!item) return E_JSON_ERROR;
-
   rc = cJSON_PrintPreallocated(jsonParms, queueParms, sizeof(queueParms), 0);
   if (!rc) return E_MALLOC;
 
   if (jsonParms) cJSON_Delete(jsonParms);
+
+  rc = OCIBindByName(qConnStmt, &hostNameBV, dbSess.oraError, (const OraText *)":hostName", -1,
+    hostName, (ub4) sizeof(hostName)-1, SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0,
+    (ub4 *) 0, (sb4) OCI_DEFAULT);
+  if (rc) return errorHandler(rc, dbSess.oraError);
 
   rc = OCIBindByName(qConnStmt, &queueParmsBV, qSess.oraError, (const OraText *)":jsonParameters", -1,
     queueParms, (ub4) strlen(queueParms)+1, SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0,
@@ -141,6 +154,8 @@ cJSON *jsonParms = NULL, *item = NULL;
     queueData, (ub4) sizeof(queueData)-1, SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0,
     (ub4 *) 0, (sb4) OCI_DEFAULT);
   if (rc) return errorHandler(rc, dbSess.oraError);
+
+  pthread_mutex_init(&dbConnMtx, NULL);
 
   return rc;
 }
@@ -161,6 +176,8 @@ int disconnectFromDatabase(void)
   dropOracleSession(&dbSess);
   disconnectFromOracleAction(&dbConn);
   disconnectFromOracleAction(&qConn);
+  pthread_mutex_destroy(&dbConnMtx);
+
   return E_SUCCESS;
 }
 
@@ -174,9 +191,6 @@ int rc = E_SUCCESS;
   if (!jsonParms) return E_JSON_ERROR;
 
   item = cJSON_AddStringToObject(jsonParms, "entryPoint", "registerVmHost");
-  if (!item) return E_JSON_ERROR;
-
-  item = cJSON_AddStringToObject(jsonParms, "hostName", hostName);
   if (!item) return E_JSON_ERROR;
 
   item = cJSON_AddStringToObject(jsonParms, "sysInfo", sysInfo);
@@ -218,6 +232,107 @@ exit_point:
   return rc;
 }
 
+int updateLifecycleState(char *machineName, char *lifecycleState)
+{
+cJSON *jsonParms = NULL, *jsonObject = NULL, *item = NULL;
+int rc = E_SUCCESS;
+
+  jsonParms = cJSON_CreateObject();
+  if (!jsonParms) return E_JSON_ERROR;
+
+  jsonObject = cJSON_CreateObject();
+  if (!jsonObject) return E_JSON_ERROR;
+
+  item = cJSON_AddStringToObject(jsonParms, "entryPoint", "updateLifecycleState");
+  if (!item) return jsonError("entryPoint");
+
+  item = cJSON_AddStringToObject(jsonParms, "clientHandle", clientHandle);
+  if (!item) return jsonError("clientHandle");
+
+  item = cJSON_AddStringToObject(jsonObject, "machineName", machineName);
+  if (!item) return jsonError("machineName");
+
+  item = cJSON_AddStringToObject(jsonObject, "lifecycleState", lifecycleState);
+  if (!item) return jsonError("lifecycleState");
+
+  rc = cJSON_AddItemToObject(jsonParms, "messagePayload", jsonObject);
+  if (!rc) return jsonError("messagePayload");
+
+  rc = cJSON_PrintPreallocated(jsonParms, jsonParametersStr, sizeof(jsonParametersStr), 0);
+  if (!rc)
+  {
+    rc = E_MALLOC;
+    goto exit_point;
+  }
+
+  pthread_mutex_lock(&dbConnMtx);
+
+  rc = OCIBindByName(dbConnStmt, &jsonParmsBV, dbSess.oraError,
+    (const OraText *)":jsonParameters", -1, jsonParametersStr, (ub4) strlen(jsonParametersStr)+1,
+    SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0, (ub4 *) 0, (sb4) OCI_DEFAULT);
+
+  rc = OCIStmtExecute(dbSess.oraSvcCtx, dbConnStmt, dbSess.oraError, 1, 0, NULL, NULL,
+    OCI_COMMIT_ON_SUCCESS);
+
+  pthread_mutex_unlock(&dbConnMtx);
+
+  if (rc && OCI_SUCCESS_WITH_INFO != rc && OCI_NO_DATA != rc) rc = errorHandler(rc, dbSess.oraError);
+
+exit_point:
+
+  if (jsonParms) cJSON_Delete(jsonParms);
+
+  return rc;
+}
+
+int sendMessageToClient(void)
+{
+cJSON *jsonParms = NULL, *item = NULL;
+int rc = E_SUCCESS;
+
+  jsonParms = cJSON_CreateObject();
+  if (!jsonParms) return E_JSON_ERROR;
+
+  item = cJSON_AddStringToObject(jsonParms, "entryPoint", "sendMessageToClient");
+  if (!item) return jsonError("entryPoint");
+
+  item = cJSON_AddStringToObject(jsonParms, "clientHandle", clientHandle);
+  if (!item) return jsonError("clientHandle");
+
+  rc = cJSON_AddItemToObject(jsonParms, "messagePayload", responsePayload);
+  if (!rc) return jsonError("messagePayload");
+
+  rc = cJSON_PrintPreallocated(jsonParms, jsonParametersStr, sizeof(jsonParametersStr), 0);
+  if (!rc)
+  {
+    rc = E_MALLOC;
+    goto exit_point;
+  }
+
+  pthread_mutex_lock(&dbConnMtx);
+
+  rc = OCIBindByName(dbConnStmt, &jsonParmsBV, dbSess.oraError,
+    (const OraText *)":jsonParameters", -1, jsonParametersStr, (ub4) strlen(jsonParametersStr)+1,
+    SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0, (ub4 *) 0, (sb4) OCI_DEFAULT);
+
+  rc = OCIStmtExecute(dbSess.oraSvcCtx, dbConnStmt, dbSess.oraError, 1, 0, NULL, NULL,
+    OCI_COMMIT_ON_SUCCESS);
+
+  pthread_mutex_unlock(&dbConnMtx);
+
+  if (rc && OCI_SUCCESS_WITH_INFO != rc && OCI_NO_DATA != rc) rc = errorHandler(rc, dbSess.oraError);
+
+exit_point:
+
+  if (jsonParms)
+  {
+    cJSON_Delete(jsonParms);
+    responsePayload = NULL;
+  }
+
+  return rc;
+}
+
 int setVmHostOffline(void)
 {
 cJSON *jsonParms = NULL, *item = NULL;
@@ -227,9 +342,6 @@ int rc = E_SUCCESS;
   if (!jsonParms) return E_JSON_ERROR;
 
   item = cJSON_AddStringToObject(jsonParms, "entryPoint", "setVmHostOffline");
-  if (!item) return E_JSON_ERROR;
-
-  item = cJSON_AddStringToObject(jsonParms, "hostName", hostName);
   if (!item) return E_JSON_ERROR;
 
   rc = cJSON_PrintPreallocated(jsonParms, jsonParametersStr, sizeof(jsonParametersStr), 0);
@@ -253,7 +365,7 @@ exit_point:
   return rc;
 }
 
-// Yes...this violates the pattern in order to simplify specifying multiple IP addresses/devices
+// Yes...this violates the pattern in order to simplify specifying multiple IP addresses/devices. JSON is very convenient sometimes!
 
 int validateVmState(void *vjsonParms)
 {
@@ -265,12 +377,17 @@ cJSON *jsonParms = (cJSON *)vjsonParms;
 
   logOutput(LOG_OUTPUT_ALWAYS, jsonParametersStr);
 
+  pthread_mutex_lock(&dbConnMtx);
+
   rc = OCIBindByName(dbConnStmt, &jsonParmsBV, dbSess.oraError,
     (const OraText *)":jsonParameters", -1, jsonParametersStr, (ub4) strlen(jsonParametersStr)+1,
     SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0, (ub4 *) 0, (sb4) OCI_DEFAULT);
 
   rc = OCIStmtExecute(dbSess.oraSvcCtx, dbConnStmt, dbSess.oraError, 1, 0, NULL, NULL,
     OCI_COMMIT_ON_SUCCESS);
+
+  pthread_mutex_unlock(&dbConnMtx);
+
   if (rc && OCI_SUCCESS_WITH_INFO != rc && OCI_NO_DATA != rc) return errorHandler(rc, dbSess.oraError);
 
   return rc;

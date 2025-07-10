@@ -10,6 +10,7 @@ as
 
 -- These values are tied to the message types handled by the vmHostMonitor (vmHostMonitorDefs.h)
 
+  HOST_MONITOR_REPLY_MESSAGE          constant pls_integer := 10;
   START_VM_MESSAGE                    constant pls_integer := 20;
   STOP_VM_MESSAGE                     constant pls_integer := 25;
   UNDEFINE_VM_MESSAGE                 constant pls_integer := 30;

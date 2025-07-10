@@ -124,9 +124,9 @@ int createCloudInitCdrom(void)
   process = popen(commandLine, "r");
   if (!process)
   {
-    snprintf(text2Log, sizeof(text2Log), "Unable to create cloud-inti CDROM: %s", strerror(errno));
+    snprintf(text2Log, sizeof(text2Log), "Unable to create cloud-init CDROM: %s", strerror(errno));
     logOutput(LOG_OUTPUT_ERROR, text2Log);
-    return E_CHILD_DIED;    // Shoudl use a better error code...
+    return E_CHILD_DIED;    // Should be using a better error code...
   }
 
   while (fgets(text2Log, sizeof(text2Log), process)) logOutput(LOG_OUTPUT_VERBOSE, text2Log);

@@ -143,7 +143,7 @@ create table virtual_machines
   persistent                        varchar2(1)
     constraint persistent_chk check (persistent in ('Y', 'N')),
   lifecycle_state                   varchar2(11) default 'stopped' not null
-    constraint lifecycle_state_chk check (lifecycle_state in ('unknown', 'starting', 'started', 'blocked', 'pausing', 'paused', 'stopping', 'stopped', 'crashed', 'pmsuspended')),
+    constraint lifecycle_state_chk check (lifecycle_state in ('unknown', 'start', 'starting', 'running', 'blocked', 'pausing', 'paused', 'stop', 'stopping', 'stopped', 'crashed', 'pmsuspended')),
   network_source                    varchar2(30),
   network_device                    varchar2(30),
   ip_addresses                      clob

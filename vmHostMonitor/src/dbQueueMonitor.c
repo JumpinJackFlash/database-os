@@ -24,6 +24,7 @@ static int queueThreadStatus = E_SUCCESS;
 static int monitorQueue(void)
 {
 int rc = E_SUCCESS;
+cJSON *item = NULL;
 
 wait_for_another:
 
@@ -51,6 +52,12 @@ wait_for_another:
 
     case MSGT_CREATE_CLOUD_INIT_CDROM:
       rc = createCloudInitCdrom();
+      if (responsePayload) cJSON_Delete(responsePayload);
+      responsePayload = cJSON_CreateObject();
+      if (!responsePayload) return E_MALLOC;
+      item = cJSON_AddStringToObject(responsePayload, "status", rc ? "failure" : "success");
+      if (!item) return E_MALLOC;
+      rc = sendMessageToClient();
       break;
   }
 
