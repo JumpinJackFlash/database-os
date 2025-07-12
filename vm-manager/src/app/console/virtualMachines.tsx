@@ -27,6 +27,7 @@ export default function VirtualMachines({ vmImages, refreshVirtualMachineList }:
   [
     { key: 'machineName', label: 'Machine Name' },
     { key: 'osVariant', label: 'O/S Variant' },
+    { key: 'status', label: 'Status'},
     { key: 'action', label: 'Action' }
   ];
 
@@ -68,12 +69,22 @@ export default function VirtualMachines({ vmImages, refreshVirtualMachineList }:
       case 'action':
         return(
           <div>
-            <Button onPress={startVirtualMachineHandler.bind(startVirtualMachineHandler, virtualMachineId)} >Start VM</Button>
-            <Button onPress={stopVirtualMachineHandler.bind(stopVirtualMachineHandler, virtualMachineId)} >Stop VM</Button>
+            { ('stopped' === virtualMachine.status || 'crashed' === virtualMachine.status) &&
+              <Button onPress={startVirtualMachineHandler.bind(startVirtualMachineHandler, virtualMachineId)} >Start VM</Button>
+            }
+            { 'running' === virtualMachine.status &&
+              <Button onPress={stopVirtualMachineHandler.bind(stopVirtualMachineHandler, virtualMachineId)} >Stop VM</Button>
+            }
+            
             <Button onPress={undefineVirtualMachineHandler.bind(undefineVirtualMachineHandler, virtualMachineId)} >Undefine VM</Button>
             <Button onPress={confirmDeleteVM.bind(confirmDeleteVM, virtualMachine)} >Delete VM</Button>
           </div>);
 
+      case 'status':
+        if ('stopped' === virtualMachine.status) return (<div style={{ color: 'red', fontWeight: 'bold'}}>{cellValue}</div>);
+        if ('running' === virtualMachine.status) return (<p style={{ color: 'green', fontWeight: 'bold'}}>{cellValue}</p>);
+        if ('crashed' === virtualMachine.status) return (<p style={{ color: 'blue', fontWeight: 'bold'}}>{cellValue}</p>);
+        return (<p style={{ fontWeight: 'bold'}}>{cellValue}</p>);
       default:
         return cellValue;
     }
@@ -87,6 +98,7 @@ export default function VirtualMachines({ vmImages, refreshVirtualMachineList }:
       vmManagerContext?.setSpinnerState(false);
       if (!response.ok) return vmManagerContext?.showErrorModal(response.jsonData.errorMessage);
       addToast({ title: "VM Started", color: 'primary' });
+      refreshVirtualMachineList();
     })
   }
 
@@ -98,6 +110,7 @@ export default function VirtualMachines({ vmImages, refreshVirtualMachineList }:
       vmManagerContext?.setSpinnerState(false);
       if (!response.ok) return vmManagerContext?.showErrorModal(response.jsonData.errorMessage);
       addToast({ color: 'primary', title: "VM Stopped" });
+      refreshVirtualMachineList();
     })
   }
 

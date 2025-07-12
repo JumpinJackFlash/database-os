@@ -20,7 +20,9 @@ int registerVmHost(char *sysInfo, char *hostCapabilities, unsigned long hypervis
 int setVmHostOffline(void);
 int sendMessageToClient(void);
 int updateLifecycleState(char *machineName, char *lifecycleState);
-int validateVmState(void *jsonParms);
+int updatePersistence(char *machineName, char *persistent);
+int validateVmState(void *vjsonParms);
+int updateVmState(void *vjsonParms);
 int getMsgForVmHostMonitor(void);
 int breakDqSession(void);
 

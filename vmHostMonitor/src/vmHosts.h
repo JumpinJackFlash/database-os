@@ -12,5 +12,6 @@ int connectToVmHost(void);
 void disconnectFromVmHost(void);
 int monitorDomainEvents(void);
 int setupEventLoop(void);
+int virtualMachineIsRunning(char *machineName);
 
 #endif /* VMHOSTS_H_ */

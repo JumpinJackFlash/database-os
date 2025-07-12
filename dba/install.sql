@@ -140,14 +140,14 @@ create table virtual_machines
   virtual_memory                    number(6),
   os_variant                        varchar2(30),
   uuid                              varchar2(36),
-  persistent                        varchar2(1)
+  persistent                        varchar2(1) default 'N' not null
     constraint persistent_chk check (persistent in ('Y', 'N')),
   lifecycle_state                   varchar2(11) default 'stopped' not null
     constraint lifecycle_state_chk check (lifecycle_state in ('unknown', 'start', 'starting', 'running', 'blocked', 'pausing', 'paused', 'stop', 'stopping', 'stopped', 'crashed', 'pmsuspended')),
   network_source                    varchar2(30),
   network_device                    varchar2(30),
-  ip_addresses                      clob
-    constraint ip_addresses_chk check(ip_addresses is json),
+  interfaces                        clob
+    constraint interfaces_chk check(interfaces is json),
   host_id                           number(7)
     references vm_hosts(host_id)
 );

@@ -43,6 +43,7 @@ export type VirtualMachineT =
   virtualMachineId: number,
   creationTimestamp: number,
   machineName: string,
+  status: string,
   virtualDiskId: string,
   virtualCdromId: string,
   vCpuCount: number,

@@ -18,6 +18,7 @@
 
 #include <commonDefs.h>
 
+#include "vmHosts.h"
 #include "oraDataLayer.h"
 
 #define MACHINE_NAME_LENGTH                     31
@@ -202,12 +203,15 @@ int startVirtualMachine(void)
   {
     snprintf(text2Log, sizeof(text2Log), "Unable to start VM: %s", strerror(errno));
     logOutput(LOG_OUTPUT_ERROR, text2Log);
+    updateLifecycleState(machineName, "crashed");
     return E_PLUGIN_ERROR;
   }
 
   while (fgets(text2Log, sizeof(text2Log), process)) logOutput(LOG_OUTPUT_VERBOSE, text2Log);
 
   pclose(process);
+
+  updateLifecycleState(machineName, virtualMachineIsRunning(machineName) ? "running" : "crashed");
 
   return E_SUCCESS;
 }

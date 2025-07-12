@@ -71,7 +71,7 @@ static char *decodeState(int state)
       return "unknown";
 
     case VIR_DOMAIN_RUNNING:
-      return "started";
+      return "running";
 
     case VIR_DOMAIN_BLOCKED:
       return "blocked";
@@ -96,6 +96,37 @@ static char *decodeState(int state)
   }
 }
 
+int virtualMachineIsRunning(char *machineName)
+{
+int rc = E_SUCCESS, x = 0, state = 0, reason = 0, running = FALSE;
+virDomain **domains = NULL, *domain = NULL;
+unsigned int dCount = 0;
+
+  rc = virConnectListAllDomains(vmConnection, &domains, 0);
+  if (-1 == rc) return vmHostErrorHandler();
+
+  dCount = rc;
+  for (x = 0; x < dCount; x++)
+  {
+    domain = domains[x];
+
+    rc = virDomainGetState(domain, &state, &reason, 0);
+    if (-1 == rc)
+    {
+      virDomainFree(domain);
+      free(domains);
+      vmHostErrorHandler();
+      return FALSE;
+    }
+    if (!strcmp(machineName, virDomainGetName(domain)) && VIR_DOMAIN_RUNNING == state) running = TRUE;
+    virDomainFree(domain);
+    if (running) break;
+  }
+  free(domains);
+
+  return running;
+}
+
 // It would be best to properly clean up if an error is thrown but, since we're going to crap out anyways we won't bother for now...
 
 static int getVirtualMachineList(void)
@@ -106,13 +137,13 @@ virDomainInterface **interfaces = NULL, *interface = NULL;
 virDomainIPAddress *address = NULL;
 char uuid[VIR_UUID_STRING_BUFLEN];
 unsigned int dCount = 0;
-cJSON *jsonParms = NULL, *item = NULL, *cjInterfaces = NULL, *cjInterface = NULL;
+cJSON *jsonParms = NULL, *item = NULL, *cjInterfaces = NULL, *cjInterface = NULL, *entryPoint = NULL;
 
   jsonParms = cJSON_CreateObject();
   if (!jsonParms) return E_JSON_ERROR;
 
-  item = cJSON_AddStringToObject(jsonParms, "entryPoint", "validateVmState");
-  if (!item) return E_JSON_ERROR;
+  entryPoint = cJSON_AddStringToObject(jsonParms, "entryPoint", "validateVmState");
+  if (!entryPoint) return E_JSON_ERROR;
 
   rc = virConnectListAllDomains(vmConnection, &domains, 0);
   if (-1 == rc) return vmHostErrorHandler();
@@ -201,6 +232,12 @@ cJSON *jsonParms = NULL, *item = NULL, *cjInterfaces = NULL, *cjInterface = NULL
     }
 
     rc = validateVmState((void *)jsonParms);
+
+    cJSON_SetValuestring(entryPoint, "updateVmState");
+    rc = updateVmState((void *)jsonParms);
+
+    cJSON_SetValuestring(entryPoint, "validateVmState");                // Reset for next iteration of the loop...
+
     virDomainFree(domains[x]);
   }
   free(domains);
@@ -223,7 +260,6 @@ struct sigaction sigAction;
 
   sigemptyset(&mask);
   sigaddset(&mask, SIGTERM);
-//  sigaddset(&mask, SIGINT);
   sigaddset(&mask, SIGQUIT);
   sigaddset(&mask, SIGABRT);
 
@@ -283,7 +319,28 @@ const char *domainName = NULL;
   logOutput(LOG_OUTPUT_ALWAYS, (char *) domainName);
   logOutput(LOG_OUTPUT_ALWAYS, (char *) decodeEvent(event));
 
-  if (VIR_DOMAIN_EVENT_STARTED == event) updateLifecycleState((char *) domainName, "starting");
+  switch (event)
+  {
+    case VIR_DOMAIN_EVENT_STARTED:
+      updateLifecycleState((char *) domainName, "starting");
+      break;
+
+    case VIR_DOMAIN_EVENT_SHUTDOWN:
+      updateLifecycleState((char *) domainName, "stopping");
+      break;
+
+    case VIR_DOMAIN_EVENT_STOPPED:
+      updateLifecycleState((char *) domainName, "stopped");
+      break;
+
+    case VIR_DOMAIN_EVENT_UNDEFINED:
+      updatePersistence((char *) domainName, "N");
+      break;
+
+    case VIR_DOMAIN_EVENT_DEFINED:
+      updatePersistence((char *) domainName, "Y");
+      break;
+  }
 
   return E_SUCCESS;
 }
@@ -303,11 +360,8 @@ int rc = E_SUCCESS;
 
   rc = virConnectDomainEventRegisterAny(vmConnection, NULL, VIR_DOMAIN_EVENT_ID_LIFECYCLE, VIR_DOMAIN_EVENT_CALLBACK(domainEventHandler), NULL, NULL);
 
-  while (keepRunning)
-  {
-    rc = virEventRunDefaultImpl();
-    logOutput(LOG_OUTPUT_ALWAYS, "ok, now what....");
-  }
+  while (keepRunning) virEventRunDefaultImpl();
+
   return rc;
 }
 

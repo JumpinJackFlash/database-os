@@ -1037,6 +1037,7 @@ package body vm_manager as
                           'virtualMachineId'  is virtual_machine_id,
                           'creationTimestamp' is db_twig.convert_date_to_unix_timestamp(creation_timestamp),
                           'machineName'       is machine_name,
+                          'status'            is lifecycle_state,
                           'virtualDiskId'     is virtual_disk_id,
                           'virtualCdromId'    is virtual_cdrom_id,
                           'vCpuCount'         is vcpu_count,

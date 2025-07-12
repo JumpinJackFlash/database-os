@@ -37,7 +37,7 @@ export default function Console({ osVariants, isoImages, qcow2Images, vmImages, 
   {
     terminateUserSession().then((response) =>
     {
-      console.log(response);
+      showErrorModal(response.jsonData.errorMessage)
       if (response.ok) router.push('/deleteCookie');
     });
   }
@@ -46,10 +46,7 @@ export default function Console({ osVariants, isoImages, qcow2Images, vmImages, 
   {
     getVirtualMachines().then((response) =>
     {
-      if (!response.ok)
-      {
-        console.log(response);
-      }
+      if (!response.ok) return showErrorModal(response.jsonData.errorMessage)
       setVirtualMachines(response.jsonData.virtualMachines);
     }); 
   }
