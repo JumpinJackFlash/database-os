@@ -201,169 +201,178 @@ export default function CreateVM({ osVariants, isoImages, qcow2Images, refreshVi
   return (
     <>
       <div>
-        <div><p><b>Create a Virtual Machine from an ISO image</b></p></div>
-        <div className="columns-2 flex w-full flex-wrap md:flex-nowrap gap-4 pt-6 pb-6">
-          <Select className="w-80" label="Select an ISO image" onChange={onChangeHandler.bind(onChangeHandler, setIsoImage)} selectedKeys={[isoImage]}>
-            {isoImages.map((isoImage) => 
-            (
-              <SelectItem className={"w-lg"} key={isoImage.objectId}>{isoImage.objectName + ' - ' + isoImage.fileExtension}</SelectItem>
-            ))}
-          </Select>
-          <div>
-            <Autocomplete className="max-w-xs" label="Select an os-variant" defaultItems={osVariants} onSelectionChange={setIsoOsVariantId} selectedKey={String(isoOsVariantId)} isVirtualized={true} >
-              { (item) => <AutocompleteItem className={"w-lg"} key={item.variantId}>{item.longName}</AutocompleteItem> }
-            </Autocomplete>
-          </div>
-        </div>
-        <div  className="columns-2 flex w-full flex-wrap md:flex-nowrap gap-4">
-          <Input value={isoVmImageName} onValueChange={setIsoVmImageName} label="VM Image Name"/>
-          <Select className="w-80" label="Select a VM Host Server" onChange={onChangeHandler.bind(onChangeHandler, setVmHostId)} selectedKeys={[vmHostId]}>
-            {vmHosts.map((vmHost) =>
-            (
-              <SelectItem className={"w-lg"} key={vmHost.hostId}>{vmHost.hostName}</SelectItem>
-            ))}
-          </Select>
-        </div>
-        <div className="columns-5 flex gap-4 pt-6 pb-6">
-          <Input className="w-24" label="VDisk Size" labelPlacement="outside" value={isoVDiskSize} onValueChange={setIsoVDiskSize} type="number" min={1}
-            endContent=
-            {
-              <div className="pointer-events-none flex items-center">
-                <span className="text-default-400 text-small">GB</span>
-              </div>
-            }
-          ></Input>
-          <Input className="w-24" label="VCPU's" labelPlacement="outside" value={isoVCpus} onValueChange={setIsoVCpus} type="number"  min={1}></Input>
-          <Input className="w-24" label="VMemory" labelPlacement="outside" value={isoVMemory} onValueChange={setIsoVMemory} type="number"  min={1}
-            endContent=
-            {
-              <div className="pointer-events-none flex items-center">
-                <span className="text-default-400 text-small">GB</span>
-              </div>
-            }
-          ></Input>
-          <Checkbox className="pt-8" isSelected={isoBridged} onValueChange={setIsoBridged} >Bridged Connection</Checkbox>
-          <Input className="w-32" label="Device Name" value={isoNetworkDevice} onValueChange={setIsoNetworkDevice} type="text" labelPlacement="outside"></Input>
-        </div>
-        <Button color="primary" type="button" onPress={callCreateVmFromIsoImage}>Create VM</Button>
-      </div>
-      <Divider className="m-4 max-w-screen-md" />
-      <div>
-        <div><p><b>Create a Virtual Machine from a QCOW2 seed</b></p></div>
-          <div className="columns-2 flex w-full flex-wrap md:flex-nowrap gap-4 pt-6 pb-6">
-            <Select className="w-80" label="Select a QCOW2 image" onChange={onChangeHandler.bind(onChangeHandler, setQcowImage)} selectedKeys={[qcowImage]}>
-            {qcow2Images.map((qcow2Image) => 
-            (
-              <SelectItem className={"w-lg"} key={qcow2Image.objectId}>{qcow2Image.objectName + ' - ' + qcow2Image.fileExtension}</SelectItem>
-            ))}
-            </Select>
-            <div>
-              <Autocomplete className="max-w-xs" label="Select an os-variant" defaultItems={osVariants} onSelectionChange={setQcowOsVariantId} selectedKey={String(qcowOsVariantId)} isVirtualized={true} >
-                { (item) => <AutocompleteItem className={"w-lg"} key={item.variantId}>{item.longName}</AutocompleteItem> }
-              </Autocomplete>
-            </div>
-          </div>
-        <div  className="columns-2 flex w-full flex-wrap md:flex-nowrap gap-4">
-          <Input value={qcowVmImageName} onValueChange={setQcowVmImageName} label="VM Image Name"/>
-          <Select className="w-80" label="Select a VM Host Server" onChange={onChangeHandler.bind(onChangeHandler, setVmHostId)} selectedKeys={[vmHostId]}>
-            {vmHosts.map((vmHost) =>
-            (
-              <SelectItem className={"w-lg"} key={vmHost.hostId}>{vmHost.hostName}</SelectItem>
-            ))}
-          </Select>
-        </div>
-        <div className="columns-4 flex gap-4 pt-6 pb-6">
-          <Input className="w-24" label="VCPU's" labelPlacement="outside" value={qcowVCpus} onValueChange={setQcowVCpus} type="number"  min={1}></Input>
-          <Input className="w-24" label="VMemory" labelPlacement="outside" value={qcowVMemory} onValueChange={setQcowVMemory} type="number" min={1}
-            endContent=
-            {
-              <div className="pointer-events-none flex items-center">
-                <span className="text-default-400 text-small">GB</span>
-              </div>
-            }
-          ></Input>
-          <Checkbox className="pt-8" isSelected={qcowBridged} onValueChange={setQcowBridged} >Bridged Connection</Checkbox>
-          <Input className="w-32" label="Device Name" value={qcowNetworkDevice} onValueChange={setQcowNetworkDevice} type="text" labelPlacement="outside"></Input>
-        </div>
         <Tabs aria-label="Options">
-          <Tab key="cloudInitFiles" title="Cloud-Init Files">
+          <Tab key="iso" title="Create From an ISO Seed">
             <Card>
               <CardBody>
-                <div className="columns-3 flex gap-4 pt-6 pb-6">
-                  <Textarea className="max-w-xs" label="Meta Data" value={metaData} onValueChange={setMetaData} />
-                  <Textarea className="max-w-xs" label="User Data"  value={userData} onValueChange={setUserData} />
-                  <Textarea className="max-w-xs" label="Network Config" value={networkConfig} onValueChange={setNetworkConfig} />
+              <div className="columns-2 flex w-full flex-wrap md:flex-nowrap gap-4 pt-6 pb-6">
+                <Select className="w-80" label="Select an ISO image" onChange={onChangeHandler.bind(onChangeHandler, setIsoImage)} selectedKeys={[isoImage]}>
+                  {isoImages.map((isoImage) => 
+                  (
+                    <SelectItem className={"w-lg"} key={isoImage.objectId}>{isoImage.objectName + ' - ' + isoImage.fileExtension}</SelectItem>
+                  ))}
+                </Select>
+                <div>
+                  <Autocomplete className="max-w-xs" label="Select an os-variant" defaultItems={osVariants} onSelectionChange={setIsoOsVariantId} selectedKey={String(isoOsVariantId)} isVirtualized={true} >
+                    { (item) => <AutocompleteItem className={"w-lg"} key={item.variantId}>{item.longName}</AutocompleteItem> }
+                  </Autocomplete>
                 </div>
-                <div className="columns-1">
-                  <Button color="primary" type="button" onPress={callCreateQcowVmUsingConfigFiles}>Create VM</Button>
-                </div>
+              </div>
+              <div  className="columns-2 flex w-full flex-wrap md:flex-nowrap gap-4">
+                <Input value={isoVmImageName} onValueChange={setIsoVmImageName} label="VM Image Name"/>
+                <Select className="w-80" label="Select a VM Host Server" onChange={onChangeHandler.bind(onChangeHandler, setVmHostId)} selectedKeys={[vmHostId]}>
+                  {vmHosts.map((vmHost) =>
+                  (
+                    <SelectItem className={"w-lg"} key={vmHost.hostId}>{vmHost.hostName}</SelectItem>
+                  ))}
+                </Select>
+              </div>
+              <div className="columns-5 flex gap-4 pt-6 pb-6">
+                <Input className="w-24" label="VDisk Size" labelPlacement="outside" value={isoVDiskSize} onValueChange={setIsoVDiskSize} type="number" min={1}
+                  endContent=
+                  {
+                    <div className="pointer-events-none flex items-center">
+                      <span className="text-default-400 text-small">GB</span>
+                    </div>
+                  }
+                ></Input>
+                <Input className="w-24" label="VCPU's" labelPlacement="outside" value={isoVCpus} onValueChange={setIsoVCpus} type="number"  min={1}></Input>
+                <Input className="w-24" label="VMemory" labelPlacement="outside" value={isoVMemory} onValueChange={setIsoVMemory} type="number"  min={1}
+                  endContent=
+                  {
+                    <div className="pointer-events-none flex items-center">
+                      <span className="text-default-400 text-small">GB</span>
+                    </div>
+                  }
+                ></Input>
+                <Checkbox className="pt-8" isSelected={isoBridged} onValueChange={setIsoBridged} >Bridged Connection</Checkbox>
+                <Input className="w-32" label="Device Name" value={isoNetworkDevice} onValueChange={setIsoNetworkDevice} type="text" labelPlacement="outside"></Input>
+              </div>
+              <Button color="primary" type="button" onPress={callCreateVmFromIsoImage}>Create VM</Button>
               </CardBody>
             </Card>
           </Tab>
-          <Tab key="cloudInitTemplate" title="Cloud-Init Template">
+          <Tab key="qcow" title="Create From a QCOW2 Seed">
             <Card>
               <CardBody>
-                <div className="columns-3 flex flex-row gap-4 pt-6 pb-6">
-                  <Input className="w-64" label="localhost-name" value={localhost} onValueChange={setLocalhost} type="text" labelPlacement="outside"></Input>
-                  <Input className="w-32" label="Admin Username" value={adminUser} onValueChange={setAdminUser} type="text" labelPlacement="outside"></Input>
-                  <Input className="w-32" label="Admin Password (optional)" value={adminPassword} onValueChange={setAdminPassword} type="password" labelPlacement="outside"></Input>
-                </div>  
-                <div className="columns-4 flex flex-row gap-4 pt-6 pb-6">
-                  <Input className="w-32" value={ip4Address} label="ip4Address" isInvalid={ip4AddressIsInvalid} onValueChange={setIp4Address} errorMessage="Enter a valid IP Address"
-                    onBlur={validateIpAddress.bind(validateIpAddress, setIp4AddressIsInvalid)} type="text" labelPlacement="outside"/>
-                  <Input className="w-32" value={ip4Netmask} label="ip4Netmask" isInvalid={ip4NetmaskIsInvalid} onValueChange={setIp4Netmask} errorMessage="Enter a valid IP Netmask"
-                    onBlur={validateIpAddress.bind(validateIpAddress, setIp4NetmaskIsInvalid)} type="text" labelPlacement="outside"/>
-                  <Input className="w-32" value={ip4Gateway} label="ip4Gateway" isInvalid={ip4GatewayIsInvalid} onValueChange={setIp4Gateway} errorMessage="Enter a valid IP Gateway"
-                    onBlur={validateIpAddress.bind(validateIpAddress, setIp4GatewayIsInvalid)} type="text" labelPlacement="outside"/>
-                  <Input className="w-64" label="Additional DNS Search Domains (separated by a space)" value={dnsSearch} onValueChange={setDnsSearch} type="text" labelPlacement="outside"></Input>
-                </div>
-                <div className="flex columns-2 gap-4 pt-6 pb-6">
-                  <div >
-                    <Input className="w-32" value={nameserver} isInvalid={nameserverIsInvalid} label="nameserver" onValueChange={setNameserver} errorMessage="Enter a valid IP Address"
-                      onBlur={validateIpAddress.bind(validateIpAddress, setNameserverIsInvalid)} type="text" labelPlacement="outside"/>
-                    <Button color="primary" type="button" onPress={addNameserver}>Add</Button>
-                  </div>
-                  <div >
-                  <Table key={nameserverKey} aria-label="table-of-nameservers">
-                      <TableHeader columns={nameserverColumns}>{(column) => <TableColumn key={column.key}>{column.label}</TableColumn>}</TableHeader>
-                      <TableBody items={nameservers} >
-                      {(item) => 
-                      (
-                        <TableRow key={item.id} >
-                          {(columnKey) => <TableCell>{renderNameserverCell(item, columnKey)}</TableCell>}
-                        </TableRow>
-                      )}
-                      </TableBody>
-                    </Table>
+                <div className="columns-2 flex w-full flex-wrap md:flex-nowrap gap-4 pt-6 pb-6">
+                  <Select className="w-80" label="Select a QCOW2 image" onChange={onChangeHandler.bind(onChangeHandler, setQcowImage)} selectedKeys={[qcowImage]}>
+                  {qcow2Images.map((qcow2Image) => 
+                  (
+                    <SelectItem className={"w-lg"} key={qcow2Image.objectId}>{qcow2Image.objectName + ' - ' + qcow2Image.fileExtension}</SelectItem>
+                  ))}
+                  </Select>
+                  <div>
+                    <Autocomplete className="max-w-xs" label="Select an os-variant" defaultItems={osVariants} onSelectionChange={setQcowOsVariantId} selectedKey={String(qcowOsVariantId)} isVirtualized={true} >
+                      { (item) => <AutocompleteItem className={"w-lg"} key={item.variantId}>{item.longName}</AutocompleteItem> }
+                    </Autocomplete>
                   </div>
                 </div>
-                <div className="flex gap-4 pt-6 pb-6">
-                  <div >
-                    <Input className="flex-none w-64 pb-6" label="Public SSH Key" value={sshKey} onValueChange={setSshKey} type="text" labelPlacement="outside"></Input>
-                    <Button color="primary" type="button" onPress={addSshKey}>Add</Button>
-                  </div>
-                  <div >
-                    <Table aria-label="table-of-ssh-keys" key={sshTableKey}>
-                      <TableHeader columns={sshColumns}>{(column) => <TableColumn key={column.key}>{column.label}</TableColumn>}</TableHeader>
-                      <TableBody items={sshKeys} >
-                      {(item) => 
-                      (
-                        <TableRow key={item.id} >
-                          {(columnKey) => <TableCell>{renderSshCell(sshKeys, item, columnKey)}</TableCell>}
-                        </TableRow>
-                      )}
-                      </TableBody>
-                    </Table>
-                  </div>
+                <div  className="columns-2 flex w-full flex-wrap md:flex-nowrap gap-4">
+                  <Input value={qcowVmImageName} onValueChange={setQcowVmImageName} label="VM Image Name"/>
+                  <Select className="w-80" label="Select a VM Host Server" onChange={onChangeHandler.bind(onChangeHandler, setVmHostId)} selectedKeys={[vmHostId]}>
+                    {vmHosts.map((vmHost) =>
+                    (
+                      <SelectItem className={"w-lg"} key={vmHost.hostId}>{vmHost.hostName}</SelectItem>
+                    ))}
+                  </Select>
                 </div>
-                <div className="columns-1">
-                  <Button color="primary" type="button" onPress={callCreateQcowVmFromTemplate}>Create VM</Button>
+                <div className="columns-4 flex gap-4 pt-6 pb-6">
+                  <Input className="w-24" label="VCPU's" labelPlacement="outside" value={qcowVCpus} onValueChange={setQcowVCpus} type="number"  min={1}></Input>
+                  <Input className="w-24" label="VMemory" labelPlacement="outside" value={qcowVMemory} onValueChange={setQcowVMemory} type="number" min={1}
+                    endContent=
+                    {
+                      <div className="pointer-events-none flex items-center">
+                        <span className="text-default-400 text-small">GB</span>
+                      </div>
+                    }
+                  ></Input>
+                  <Checkbox className="pt-8" isSelected={qcowBridged} onValueChange={setQcowBridged} >Bridged Connection</Checkbox>
+                  <Input className="w-32" label="Device Name" value={qcowNetworkDevice} onValueChange={setQcowNetworkDevice} type="text" labelPlacement="outside"></Input>
                 </div>
+                <Tabs aria-label="Options">
+                  <Tab key="cloudInitFiles" title="Cloud-Init Files">
+                    <Card>
+                      <CardBody>
+                        <div className="columns-3 flex gap-4 pt-6 pb-6">
+                          <Textarea className="max-w-xs" label="Meta Data" value={metaData} onValueChange={setMetaData} />
+                          <Textarea className="max-w-xs" label="User Data"  value={userData} onValueChange={setUserData} />
+                          <Textarea className="max-w-xs" label="Network Config" value={networkConfig} onValueChange={setNetworkConfig} />
+                        </div>
+                        <div className="columns-1">
+                          <Button color="primary" type="button" onPress={callCreateQcowVmUsingConfigFiles}>Create VM</Button>
+                        </div>
+                      </CardBody>
+                    </Card>
+                  </Tab>
+                  <Tab key="cloudInitTemplate" title="Cloud-Init Template">
+                    <Card>
+                      <CardBody>
+                        <div className="columns-3 flex flex-row gap-4 pt-6 pb-6">
+                          <Input className="w-64" label="localhost-name" value={localhost} onValueChange={setLocalhost} type="text" labelPlacement="outside"></Input>
+                          <Input className="w-32" label="Admin Username" value={adminUser} onValueChange={setAdminUser} type="text" labelPlacement="outside"></Input>
+                          <Input className="w-32" label="Admin Password (optional)" value={adminPassword} onValueChange={setAdminPassword} type="password" labelPlacement="outside"></Input>
+                        </div>  
+                        <div className="columns-4 flex flex-row gap-4 pt-6 pb-6">
+                          <Input className="w-32" value={ip4Address} label="ip4Address" isInvalid={ip4AddressIsInvalid} onValueChange={setIp4Address} errorMessage="Enter a valid IP Address"
+                            onBlur={validateIpAddress.bind(validateIpAddress, setIp4AddressIsInvalid)} type="text" labelPlacement="outside"/>
+                          <Input className="w-32" value={ip4Netmask} label="ip4Netmask" isInvalid={ip4NetmaskIsInvalid} onValueChange={setIp4Netmask} errorMessage="Enter a valid IP Netmask"
+                            onBlur={validateIpAddress.bind(validateIpAddress, setIp4NetmaskIsInvalid)} type="text" labelPlacement="outside"/>
+                          <Input className="w-32" value={ip4Gateway} label="ip4Gateway" isInvalid={ip4GatewayIsInvalid} onValueChange={setIp4Gateway} errorMessage="Enter a valid IP Gateway"
+                            onBlur={validateIpAddress.bind(validateIpAddress, setIp4GatewayIsInvalid)} type="text" labelPlacement="outside"/>
+                          <Input className="w-64" label="Additional DNS Search Domains (separated by a space)" value={dnsSearch} onValueChange={setDnsSearch} type="text" labelPlacement="outside"></Input>
+                        </div>
+                        <div className="flex columns-2 gap-4 pt-6 pb-6">
+                          <div >
+                            <Input className="w-32" value={nameserver} isInvalid={nameserverIsInvalid} label="nameserver" onValueChange={setNameserver} errorMessage="Enter a valid IP Address"
+                              onBlur={validateIpAddress.bind(validateIpAddress, setNameserverIsInvalid)} type="text" labelPlacement="outside"/>
+                            <Button color="primary" type="button" onPress={addNameserver}>Add</Button>
+                          </div>
+                          <div >
+                          <Table key={nameserverKey} aria-label="table-of-nameservers">
+                              <TableHeader columns={nameserverColumns}>{(column) => <TableColumn key={column.key}>{column.label}</TableColumn>}</TableHeader>
+                              <TableBody items={nameservers} >
+                              {(item) => 
+                              (
+                                <TableRow key={item.id} >
+                                  {(columnKey) => <TableCell>{renderNameserverCell(item, columnKey)}</TableCell>}
+                                </TableRow>
+                              )}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </div>
+                        <div className="flex gap-4 pt-6 pb-6">
+                          <div >
+                            <Input className="flex-none w-64 pb-6" label="Public SSH Key" value={sshKey} onValueChange={setSshKey} type="text" labelPlacement="outside"></Input>
+                            <Button color="primary" type="button" onPress={addSshKey}>Add</Button>
+                          </div>
+                          <div >
+                            <Table aria-label="table-of-ssh-keys" key={sshTableKey}>
+                              <TableHeader columns={sshColumns}>{(column) => <TableColumn key={column.key}>{column.label}</TableColumn>}</TableHeader>
+                              <TableBody items={sshKeys} >
+                              {(item) => 
+                              (
+                                <TableRow key={item.id} >
+                                  {(columnKey) => <TableCell>{renderSshCell(sshKeys, item, columnKey)}</TableCell>}
+                                </TableRow>
+                              )}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </div>
+                        <div className="columns-1">
+                          <Button color="primary" type="button" onPress={callCreateQcowVmFromTemplate}>Create VM</Button>
+                        </div>
+                      </CardBody>
+                    </Card>
+                  </Tab>
+                </Tabs>
               </CardBody>
             </Card>
           </Tab>
         </Tabs>
-      </div>
+     </div>
     </>
   );
 }

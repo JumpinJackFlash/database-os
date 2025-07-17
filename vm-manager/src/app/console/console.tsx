@@ -28,8 +28,13 @@ export default function Console({ osVariants, isoImages, qcow2Images, vmImages, 
   const [ spinnerSpinning, setSpinnerSpinning ] = useState(false);
   const [ spinnerText, setSpinnerText ] = useState('');
 
-  const {isOpen, onOpen, onOpenChange} = useDisclosure();
+  const {isOpen: isErrorModalOpen, onOpen: onErrorModalOpen, onOpenChange: onErrorModalOpenChange,
+    onClose: onErrorModalClose } = useDisclosure();
+
   const [ errorMessage, setErrorMessage ] = useState('');
+
+  const {isOpen: isCreateVmModalOpen, onOpen: onCreateVmModalOpen, onOpenChange: onCreateVmModalOpenChange,
+    onClose: onCreateVmModalClose } = useDisclosure();
 
   const router = useRouter();
   
@@ -37,8 +42,8 @@ export default function Console({ osVariants, isoImages, qcow2Images, vmImages, 
   {
     terminateUserSession().then((response) =>
     {
-      showErrorModal(response.jsonData.errorMessage)
-      if (response.ok) router.push('/deleteCookie');
+      if (!response.ok) showErrorModal(response.jsonData.errorMessage)
+      router.push('/deleteCookie');
     });
   }
 
@@ -60,26 +65,46 @@ export default function Console({ osVariants, isoImages, qcow2Images, vmImages, 
   function showErrorModal(errorMessage: string)
   {
     setErrorMessage(errorMessage);
-    onOpen();
+    onErrorModalOpen();
   }
 
   let contextValue = { setSpinnerState: setSpinnerState, showErrorModal: showErrorModal }
 
   return (
     <VmManagerContext.Provider value={contextValue}>
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="lg">
+      <Modal isOpen={isErrorModalOpen} onOpenChange={onErrorModalOpenChange} size="lg">
         <ModalContent>
-          {(onClose) => (
+          {(onErrorModalClose) => (
             <>
               <ModalHeader className="flex flex-col gap-1">API Error</ModalHeader>
               <ModalBody>
                 <p>{errorMessage}</p>
               </ModalBody>
               <ModalFooter>
-                <Button color="danger" variant="light" onPress={onClose}>
+                <Button color="danger" variant="light" onPress={onErrorModalClose}>
                   Close
                 </Button>
-                <Button color="primary" onPress={onClose}>
+                <Button color="primary" onPress={onErrorModalClose}>
+                  Action
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>                
+      <Modal isOpen={isCreateVmModalOpen} onOpenChange={onCreateVmModalOpenChange} size="5xl">
+        <ModalContent>
+          {(onCreateVmModalClose) => (
+            <>
+              <ModalHeader className="flex flex-col gap-1">Create a New VM</ModalHeader>
+              <ModalBody>
+                <CreateVM osVariants={osVariants} qcow2Images={qcow2Images} isoImages={isoImages} refreshVirtualMachineList={refreshVirtualMachineList} vmHosts={vmHosts}/>
+              </ModalBody>
+              <ModalFooter>
+                <Button color="danger" variant="light" onPress={onCreateVmModalClose}>
+                  Close
+                </Button>
+                <Button color="primary" onPress={onCreateVmModalClose}>
                   Action
                 </Button>
               </ModalFooter>
@@ -95,8 +120,10 @@ export default function Console({ osVariants, isoImages, qcow2Images, vmImages, 
       <div className=" max-w-screen-md flex-col gap-4 rounded-large px-8 pb-10 pt-6">
         <div className=" max-w-screen-md flex-col gap-4 rounded-large px-8 pb-10 pt-6">
           <VirtualMachines vmImages={virtualMachines} refreshVirtualMachineList={refreshVirtualMachineList} />
-          <Divider className="m-4 max-w-screen-md" />
-          <CreateVM osVariants={osVariants} qcow2Images={qcow2Images} isoImages={isoImages} refreshVirtualMachineList={refreshVirtualMachineList} vmHosts={vmHosts}/>
+          <div>
+            <Button color="primary" onPress={refreshVirtualMachineList}>Refresh</Button>
+            <Button color="success" onPress={onCreateVmModalOpen}>New VM</Button>
+          </div>
           <Divider className="m-4 max-w-screen-md" />
           <div>
             <Button color="primary" type="button" onPress={logout}>Log Out...</Button>
