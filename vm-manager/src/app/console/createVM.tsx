@@ -16,7 +16,7 @@ interface CreateVMPropsI
   isoImages: SeedImagesT;
   qcow2Images: SeedImagesT;
   refreshVirtualMachineList: RefreshVirtualMachineListT;
-  vmHosts: VmHostsT
+  vmHosts?: VmHostsT
 };
 
 export default function CreateVM({ osVariants, isoImages, qcow2Images, refreshVirtualMachineList, vmHosts }: CreateVMPropsI) 

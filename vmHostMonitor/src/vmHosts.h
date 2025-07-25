@@ -13,5 +13,7 @@ void disconnectFromVmHost(void);
 int monitorDomainEvents(void);
 int setupEventLoop(void);
 int virtualMachineIsRunning(char *machineName);
+void *getVirtualDomain(char *machineName);
+int vmHostErrorHandler(void);
 
 #endif /* VMHOSTS_H_ */

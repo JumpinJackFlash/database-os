@@ -5,15 +5,17 @@
 #include <signal.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <limits.h>
 #include <sys/utsname.h>
 #include <libvirt/libvirt.h>
 #include <libvirt/virterror.h>
 
 #include <cjson/cJSON.h>
 
-#include <commonDefs.h>
-
+#include "vmHostMonitorDefs.h"
 #include "oraDataLayer.h"
+#include "errors.h"
+#include "logger.h"
 
 static virConnectPtr vmConnection = NULL;
 static virErrorPtr vmError = NULL;
@@ -21,7 +23,7 @@ static virErrorPtr vmError = NULL;
 static int selfSignalFD = 0;
 static int keepRunning = TRUE;
 
-static int vmHostErrorHandler(void)
+int vmHostErrorHandler(void)
 {
   logOutput(LOG_OUTPUT_ERROR, (char *) virGetLastErrorMessage());
   return E_LIBVIRT_ERROR;
@@ -94,6 +96,40 @@ static char *decodeState(int state)
     default:
       return "unknown";
   }
+}
+
+void *getVirtualDomain(char *machineName)
+{
+int rc = E_SUCCESS, x = 0, state = 0, reason = 0;
+virDomain **domains = NULL, *domain = NULL;
+unsigned int dCount = 0;
+
+  rc = virConnectListAllDomains(vmConnection, &domains, 0);
+  if (-1 == rc)
+  {
+    vmHostErrorHandler();
+    return NULL;
+  }
+
+  dCount = rc;
+  for (x = 0; x < dCount; x++)
+  {
+    domain = domains[x];
+
+    rc = virDomainGetState(domain, &state, &reason, 0);
+    if (-1 == rc)
+    {
+      virDomainFree(domain);
+      free(domains);
+      vmHostErrorHandler();
+      return NULL;
+    }
+    if (!strcmp(machineName, virDomainGetName(domain))) return domain;
+    virDomainFree(domain);
+  }
+  free(domains);
+
+  return NULL;
 }
 
 int virtualMachineIsRunning(char *machineName)

@@ -12,7 +12,7 @@ extern int messageType;
 extern cJSON *messagePayload;
 extern cJSON *responsePayload;
 
-int connectToDatabase(void);
+int connectToDatabase(char *hostName);
 int disconnectFromDatabase(void);
 void closeStatementHandles(void);
 int registerVmHost(char *sysInfo, char *hostCapabilities, unsigned long hypervisorVersion, unsigned long libvirtVersion,

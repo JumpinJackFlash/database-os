@@ -1,31 +1,28 @@
 'use client'
 
-import { startVirtualMachine, stopVirtualMachine, deleteVirtualMachine, undefineVirtualMachine } from "@/utils/serverFunctions";
-import { Checkbox,  Button } from "@heroui/react";
+import { startVirtualMachine, stopVirtualMachine, undefineVirtualMachine } from "@/utils/serverFunctions";
 import React, { useState, useCallback, useEffect, useContext } from "react";
 import { Table,  TableHeader,  TableBody,  TableColumn,  TableRow,  TableCell } from "@heroui/table";
-import { VirtualMachinesT, RefreshVirtualMachineListT } from "@/utils/dataTypes";
-import { addToast } from "@heroui/react";
+import { VirtualMachinesT, VirtualMachineT, RefreshVirtualMachineListT } from "@/utils/dataTypes";
+import { Button, addToast } from "@heroui/react";
 import {  Modal,  ModalContent,  ModalHeader,  ModalBody,  ModalFooter, useDisclosure } from "@heroui/modal";
+
+import VirtualMachineDetails from './virtualMachineDetails';
+
 import { VmManagerContext } from "@/utils/vmManagerContext";
 
-interface VirtualMachinePropsI 
+interface VirtualMachinesPropsI 
 {
   vmImages: VirtualMachinesT;
   refreshVirtualMachineList: RefreshVirtualMachineListT
 };
 
-export default function VirtualMachines({ vmImages, refreshVirtualMachineList }: VirtualMachinePropsI) 
+export default function VirtualMachines({ vmImages, refreshVirtualMachineList }: VirtualMachinesPropsI) 
 {
-  const {isOpen, onOpen, onOpenChange} = useDisclosure();
-
-  const { isOpen: isDetailModalOpen, onOpen: onDetailModalOpen, onOpenChange: onDetailModalOpenChange, 
-    onClose: onDetailModalClose } = useDisclosure();
+  const { isOpen: isDetailModalOpen, onOpen: openDetailModal, onOpenChange: openDetailModalChange, 
+    onClose: closeDetailModal } = useDisclosure();
   
-  const [ deleteVmConfirmed, setDeleteVmConfirmed ] = useState(false);
-  const [ deleteBootDiskConfirmed, setDeleteBootDiskConfirmed ] = useState(false);
-  const [ deleteThisVM, setDeleteThisVM ] = useState<VirtualMachineT | undefined>(undefined);
-  const [ selectedVM, setSelectedVm ] = useState<VirtualMachineT | undefined>(undefined);
+  const [ selectedVM, setSelectedVm ] = useState<VirtualMachineT>();
 
   const vmColumns =
   [
@@ -36,11 +33,9 @@ export default function VirtualMachines({ vmImages, refreshVirtualMachineList }:
     { key: 'action', label: 'Action' }
   ];
 
-  type VirtualMachineT = (typeof vmImages)[0];
-
   const vmManagerContext = useContext(VmManagerContext);
 
-/*  useEffect(() =>
+  useEffect(() =>
   {
     var intervalId: any;
 
@@ -53,32 +48,12 @@ export default function VirtualMachines({ vmImages, refreshVirtualMachineList }:
     {
       if (undefined !== intervalId) clearInterval(intervalId);
     }
-  }, []); */
+  }, []);
 
-  function confirmDeleteVM(virtualMachine: VirtualMachineT)
+  function showVmDetails(virtualMachine: VirtualMachineT)
   {
-    setDeleteVmConfirmed(false);
-    setDeleteBootDiskConfirmed(false);
-    setDeleteThisVM(virtualMachine);
-    onOpen();
-  }
-
-  function deleteVM(onClose: Function, action: string)
-  {
-    if ('confirmed' === action && undefined !== deleteThisVM)
-    {
-      vmManagerContext?.setSpinnerState(true, 'Deleting VM....');
-      deleteVirtualMachine(deleteThisVM?.virtualMachineId, deleteBootDiskConfirmed).then((response) =>
-      {
-        vmManagerContext?.setSpinnerState(false);
-        if (!response.ok) return vmManagerContext?.showErrorModal(response.jsonData.errorMessage);
-        addToast({ color: "primary", title: "VM Deleted"});
-        refreshVirtualMachineList();
-        onClose();
-      });
-    }
-    else
-      onClose();
+    setSelectedVm(virtualMachine);
+    openDetailModal();
   }
 
   const renderVmCell = useCallback((virtualMachine: VirtualMachineT, columnKey: React.Key, virtualMachineId: number) => 
@@ -95,8 +70,7 @@ export default function VirtualMachines({ vmImages, refreshVirtualMachineList }:
             { 'running' === virtualMachine.status &&
               <Button color='danger' onPress={stopVirtualMachineHandler.bind(stopVirtualMachineHandler, virtualMachineId)} >Stop VM</Button>
             }
-            <Button onPress={undefineVirtualMachineHandler.bind(undefineVirtualMachineHandler, virtualMachineId)} >Details</Button>
-            <Button onPress={undefineVirtualMachineHandler.bind(undefineVirtualMachineHandler, virtualMachineId)} >Undefine VM</Button>
+            <Button onPress={showVmDetails.bind(showVmDetails, virtualMachine)} >Details</Button>
           </div>);
 
       case 'status':
@@ -104,6 +78,7 @@ export default function VirtualMachines({ vmImages, refreshVirtualMachineList }:
         if ('running' === virtualMachine.status) return (<p style={{ color: 'green', fontWeight: 'bold'}}>{cellValue}</p>);
         if ('crashed' === virtualMachine.status) return (<p style={{ color: 'blue', fontWeight: 'bold'}}>{cellValue}</p>);
         return (<p style={{ fontWeight: 'bold'}}>{cellValue}</p>);
+
       default:
         return cellValue;
     }
@@ -133,43 +108,19 @@ export default function VirtualMachines({ vmImages, refreshVirtualMachineList }:
     })
   }
 
-  function undefineVirtualMachineHandler(virtualMachineId: number)
-  {
-    undefineVirtualMachine(virtualMachineId).then((response) =>
-    {
-      if (!response.ok) return vmManagerContext?.showErrorModal(response.jsonData.errorMessage);
-      addToast({ color: 'primary', title: "VM Undefined" });
-    })
-  }
-
   return (
     <>
-      <Modal isOpen={isOpen} onOpenChange={onOpenChange} size="lg">
+      <Modal isOpen={isDetailModalOpen} onOpenChange={openDetailModalChange} size="4xl">
         <ModalContent>
           {(onClose) => (
             <>
-              <ModalHeader className="flex flex-col gap-1">Delete Virtual Machine</ModalHeader>
-              <ModalBody>
-                <div className="columns-2 flex gap-1">
-                  <div>Are you sure you want to delete this Virtual Machine: </div>
-                  <div><b>{deleteThisVM?.machineName}</b></div>
-                </div>
-                <div>
-                  <Checkbox isSelected={deleteVmConfirmed} onValueChange={setDeleteVmConfirmed}>Delete the VM?</Checkbox>
-                </div>
-                { deleteThisVM?.virtualDiskId !== null &&
-                  <div>
-                    <Checkbox isSelected={deleteBootDiskConfirmed} onValueChange={setDeleteBootDiskConfirmed}>Delete the boot disk?</Checkbox>
-                  </div>
-                }
-              </ModalBody>
+              <ModalHeader className="flex flex-col gap-1">Virtual Machine Details</ModalHeader>
+              { selectedVM !== undefined &&
+
+                <VirtualMachineDetails virtualMachine={selectedVM} refreshVirtualMachineList={refreshVirtualMachineList} />
+              }
               <ModalFooter>
-                <Button color="danger" variant="light" onPress={deleteVM.bind(deleteVM, onClose, 'canceled')}>
-                  Cancel
-                </Button>
-                <Button color="primary" isDisabled={!deleteVmConfirmed} onPress={deleteVM.bind(deleteVM, onClose, 'confirmed')}>
-                  Delete
-                </Button>
+                <Button variant="light" onPress={closeDetailModal}>Close</Button>
               </ModalFooter>
             </>              
           )}
@@ -182,8 +133,9 @@ export default function VirtualMachines({ vmImages, refreshVirtualMachineList }:
           <TableBody items={vmImages}>        
           {(item) => 
           (
-            <TableRow key={item.virtualMachineId}>
-              {(columnKey) => <TableCell>{renderVmCell(item, columnKey, item.virtualMachineId)}</TableCell>}
+            <TableRow key={item?.virtualMachineId}>
+            { /* @ts-ignore - typescript is a fuckin' PITA.... */ }
+              {(columnKey) => <TableCell>{renderVmCell(item, columnKey, item?.virtualMachineId)}</TableCell>}
             </TableRow>
           )}
           </TableBody>

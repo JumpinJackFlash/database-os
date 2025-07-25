@@ -10,12 +10,14 @@
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
+#include <limits.h>
 
 #include <cjson/cJSON.h>
 
-#include "commonDefs.h"
-#include "oraDataLayer.h"
 #include "vmHostMonitorDefs.h"
+#include "errors.h"
+#include "oraDataLayer.h"
+#include "logger.h"
 #include "virtualMachines.h"
 
 static pthread_t queueThreadID;
@@ -70,13 +72,13 @@ wait_for_another:
 
 static void *queueThread(void *dumbArg)
 {
-int rc = E_SUCCESS;
+int rc = E_SUCCESS, cancelType = 0;
 
-  setThreadCancelType();
+  pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, &cancelType);
 
   rc = monitorQueue();
 
-  if (rc && E_STOP_QUEUE_THREAD != rc) logOutput(LOG_OUTPUT_ERROR, getDbPluginErrorText(rc));
+  if (rc && E_STOP_QUEUE_THREAD != rc) logOutput(LOG_OUTPUT_ERROR, getErrorText(rc));
 
   queueThreadStatus = rc;
 

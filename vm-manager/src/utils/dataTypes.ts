@@ -51,7 +51,10 @@ export type VirtualMachineT =
   osVariant: string,
   networkSource: string,
   networkDevice: string,
-  assignedToHost: string
+  host: string,
+  interfaces: string,
+  persistent: string,
+  uuid: string
 };
 
 export type VirtualMachinesT =

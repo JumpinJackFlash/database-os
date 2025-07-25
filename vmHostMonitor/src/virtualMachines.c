@@ -12,27 +12,19 @@
 #include <sys/prctl.h>
 #include <errno.h>
 #include <malloc.h>
+#include <limits.h>
 #include <cjson/cJSON.h>
 #include <libvirt/libvirt.h>
 #include <libvirt/virterror.h>
 
-#include <commonDefs.h>
-
-#include "vmHosts.h"
+#include "vmHostMonitorDefs.h"
 #include "oraDataLayer.h"
-
-#define MACHINE_NAME_LENGTH                     31
-#define VDISK_FILENAME_LENGTH                   256
-#define OS_VARIANT_LENGTH                       31
-#define NETWORK_SOURCE_LENGTH                   31
-#define NETWORK_DEVICE_LENGTH                   31
-#define VDISK_OPTIONS_LENGTH                    128
-
-#define VIRT_INSTALL                            "virt-install"
-#define VIRT_SHELL                              "virsh"
+#include "errors.h"
+#include "logger.h"
+#include "vmHosts.h"
 
 char *machineName, *vDiskFilename, *sparseDiskAllocation, *vCdromFilename, *osVariant, *networkSource,
-  *networkDevice, *bootDevice, commandLine[2048], *metaDataFilename, *userDataFilename, *netDataFilename;
+  *networkDevice, *bootDevice, commandLine[2048], *metaDataFilename, *userDataFilename, *netDataFilename, *persistent;
 
 int vCpus = 0, vMemory = 0, vDiskSize = 0, rc = E_SUCCESS;
 
@@ -142,6 +134,8 @@ int startVirtualMachine(void)
   char text2Log[LOGMSG_LENGTH];
   char vDiskOptions[VDISK_OPTIONS_LENGTH];
   cJSON *item = NULL;
+  virDomain *virtualDomain = NULL;
+  int rc = E_SUCCESS;
 
   item = cJSON_GetObjectItemCaseSensitive(messagePayload, "machineName");
   if (!item) return jsonError("machineName");
@@ -189,6 +183,10 @@ int startVirtualMachine(void)
   if (!item) return jsonError("bootDevice");
   bootDevice = item->valuestring;
 
+  item = cJSON_GetObjectItemCaseSensitive(messagePayload, "persistent");
+  if (!item) return jsonError("persistent");
+  persistent = item->valuestring;
+
   if (!vCdromFilename)
     snprintf(commandLine, sizeof(commandLine), "%s --name %s --memory %d --vcpus %d --boot %s --disk %s --os-variant %s --virt-type kvm --network %s=%s,model=virtio --import --noautoconsole --connect qemu:///system 2>&1",
       VIRT_INSTALL, machineName, vMemory, vCpus, bootDevice, vDiskFilename, osVariant, networkSource, networkDevice);
@@ -212,6 +210,15 @@ int startVirtualMachine(void)
   pclose(process);
 
   updateLifecycleState(machineName, virtualMachineIsRunning(machineName) ? "running" : "crashed");
+
+  if ('N' == *persistent)
+  {
+    virtualDomain = (virDomain *) getVirtualDomain(machineName);
+    if (!virtualDomain) return E_RETURN_TYPE;
+    rc = virDomainUndefineFlags(virtualDomain, 0);
+    if (rc) vmHostErrorHandler();
+    virDomainFree(virtualDomain);
+  }
 
   return E_SUCCESS;
 }

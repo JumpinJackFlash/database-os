@@ -1,6 +1,6 @@
 'use client'
 
-import VirtualMachines from "./virtualMachines";
+import VirtualMachines from './virtualMachines';
 import CreateVM from "./createVM";
 
 import { getVirtualMachines, terminateUserSession } from "@/utils/serverFunctions";

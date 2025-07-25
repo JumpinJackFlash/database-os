@@ -307,6 +307,7 @@ package body vm_manager as
     l_json_parameters.put('osVariant', l_virtual_machine.os_variant);
     l_json_parameters.put('networkSource', l_virtual_machine.network_source);
     l_json_parameters.put('networkDevice', l_virtual_machine.network_device);
+    l_json_parameters.put('persistent', l_virtual_machine.persistent);
     l_json_parameters.put('bootDevice', p_boot_device);
 
     l_dbos_message := dbos$message_t(dbms_session.unique_session_id, l_host_name, vm_manager.START_VM_MESSAGE, l_json_parameters.to_string);
@@ -1045,6 +1046,9 @@ package body vm_manager as
                           'osVariant'         is os_variant,
                           'networkSource'     is network_source,
                           'networkDevice'     is network_device,
+                          'uuid'              is uuid,
+                          'interfaces'        is interfaces,
+                          'persistent'        is persistent,
                           'host'              is vm_manager.get_vm_host_name(host_id)) order by machine_name returning clob) returning clob)
       into  l_rows, l_result
       from  virtual_machines;

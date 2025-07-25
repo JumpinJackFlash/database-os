@@ -14,10 +14,31 @@
 
 #include <cjson/cJSON.h>
 
-#include <commonDefs.h>
-#include <oraCommon.h>
-
+#include "vmHostMonitorDefs.h"
 #include "vmHostMonitor.h"
+#include "errors.h"
+#include "logger.h"
+
+typedef struct
+{
+  OCISession    *oraSession;
+  OCIAuthInfo   *authInfo;
+  OCISvcCtx     *oraSvcCtx;
+  OCIError      *oraError;
+  char          username[DB_NAME_LENGTH];
+  char          password[DB_NAME_LENGTH];
+} OCI_SESSION;
+
+typedef struct
+{
+  OCIEnv        *oraEnv;
+  OCIServer     *oraServer;
+  OCICPool      *connectionPool;
+  OCISPool      *sessionPool;
+  OraText       *poolName;
+  sb4           poolNameLength;
+  char          database[DB_NAME_LENGTH];
+} OCI_CONNECTION;
 
 static OCI_CONNECTION   dbConn;                                                 // Main thread connection.
 static OCI_CONNECTION   qConn;
@@ -46,11 +67,75 @@ static OCIBind *hostNameBV = NULL;
 static sb4 oraErrorCode = OCI_SUCCESS;
 
 static pthread_mutex_t dbConnMtx;
+static int sessionCount = 0;
 
 char clientHandle[CLIENT_HANDLE_LENGTH];
 cJSON *messagePayload = NULL;
 cJSON *responsePayload = NULL;
 int messageType;
+
+char oraErrorText[ORA_ERROR_TEXT_LENGTH];
+
+static int oraErrorHandler(int rc, OCIError *error)
+{
+  switch((sword) rc)
+  {
+    case OCI_SUCCESS:
+      return E_SUCCESS;
+
+    case OCI_NEED_DATA:
+      return E_SUCCESS;
+
+    case OCI_NO_DATA:
+      OCIErrorGet ((dvoid *) error, (ub4) 1, (text *) NULL, &oraErrorCode,
+                    (OraText *)oraErrorText, (ub4) sizeof(oraErrorText), (ub4) OCI_HTYPE_ERROR);
+      if ('\n' == oraErrorText[strlen(oraErrorText)-1])
+        oraErrorText[strlen(oraErrorText)-1] = '\0';
+      return E_NO_DATA;
+
+    case OCI_SUCCESS_WITH_INFO:
+      OCIErrorGet ((dvoid *) error, (ub4) 1, (text *) NULL, &oraErrorCode,
+                    (OraText *)oraErrorText, (ub4) sizeof(oraErrorText), (ub4) OCI_HTYPE_ERROR);
+      if ('\n' == oraErrorText[strlen(oraErrorText)-1])
+        oraErrorText[strlen(oraErrorText)-1] = '\0';
+      return E_SUCCESS;
+
+    case OCI_ERROR:
+      OCIErrorGet ((dvoid *) error, (ub4) 1, (text *) NULL, &oraErrorCode,
+                    (OraText *)oraErrorText, (ub4) sizeof(oraErrorText), (ub4) OCI_HTYPE_ERROR);
+      if ('\n' == oraErrorText[strlen(oraErrorText)-1])
+        oraErrorText[strlen(oraErrorText)-1] = '\0';
+      return E_OCI_ERROR;
+
+    case OCI_INVALID_HANDLE:
+        strncpy(oraErrorText, "Invalid handle.", sizeof(oraErrorText)-1);
+      return E_OCI_ERROR;
+
+    case OCI_STILL_EXECUTING:
+      return E_SUCCESS;
+
+    case OCI_CONTINUE:
+      return E_SUCCESS;
+
+    default:
+      OCIErrorGet ((dvoid *) error, (ub4) 1, (text *) NULL, &oraErrorCode,
+                    (OraText *)oraErrorText, (ub4) sizeof(oraErrorText), (ub4) OCI_HTYPE_ERROR);
+      if ('\n' == oraErrorText[strlen(oraErrorText)-1])
+        oraErrorText[strlen(oraErrorText)-1] = '\0';
+      return E_OCI_ERROR;
+  }
+}
+
+static char *getOraErrorText(void)
+{
+  return oraErrorText;
+}
+
+static sb4 getOraErrorCode(void)
+{
+  return oraErrorCode;
+}
+
 
 static int errorHandler(int rc, OCIError *error)
 {
@@ -69,6 +154,53 @@ int oraReturnCode = E_SUCCESS;
   return rc;
 }
 
+int getSessionFromSPool(OCI_CONNECTION *cObj, OCI_SESSION *sObj)
+{
+sword rc = OCI_SUCCESS;
+
+  rc = OCIHandleAlloc(cObj->oraEnv, (void *)&sObj->oraError, OCI_HTYPE_ERROR, 0, (dvoid **)0);
+  if (rc) return oraErrorHandler(rc, NULL);
+
+  rc = OCIHandleAlloc(cObj->oraEnv, (void *)&sObj->authInfo, OCI_HTYPE_AUTHINFO, 0, (dvoid **)0);
+  if (rc) return oraErrorHandler(rc, NULL);
+
+  rc = OCISessionGet(cObj->oraEnv, sObj->oraError, &sObj->oraSvcCtx, sObj->authInfo, cObj->poolName,
+      cObj->poolNameLength, 0, 0, 0, 0, 0, OCI_SESSGET_SPOOL);
+  if (rc) return oraErrorHandler(rc, sObj->oraError);
+
+  sessionCount++;
+
+  return rc;
+}
+
+static int connectToOracleAction(OCI_CONNECTION *cObj)
+{
+sword rc = OCI_SUCCESS;
+OCIError *oraError = NULL;
+
+  rc = OCIEnvCreate(&cObj->oraEnv, OCI_THREADED|OCI_OBJECT, (dvoid *)0, 0, 0, 0, (size_t) 0, (dvoid **)0);
+  if (rc) return oraErrorHandler(rc, NULL);
+
+  rc = OCIHandleAlloc(cObj->oraEnv, (void *)&cObj->oraServer, OCI_HTYPE_SERVER, 0, (dvoid **)0);
+  if (rc) return oraErrorHandler(rc, NULL);
+
+  rc = OCIHandleAlloc(cObj->oraEnv, (void *)&oraError, OCI_HTYPE_ERROR, 0, (dvoid **)0);
+  if (rc) return oraErrorHandler(rc, NULL);
+
+  rc = OCIServerAttach(cObj->oraServer, oraError, (OraText *)cObj->database, (sb4)strlen(cObj->database), OCI_DEFAULT);
+  if (rc)
+  {
+    oraErrorHandler(rc, oraError);
+    OCIHandleFree(oraError, OCI_HTYPE_ERROR);
+    return E_OCI_ERROR;
+  }
+
+  if (oraError) rc = OCIHandleFree(oraError, OCI_HTYPE_ERROR);
+  if (rc) return oraErrorHandler(rc, oraError);
+
+  return E_SUCCESS;
+}
+
 static int reEstablishQueueConnection(void)
 {
 int rc = E_SUCCESS;
@@ -81,32 +213,102 @@ int rc = E_SUCCESS;
   return rc;
 }
 
-int connectToDatabase(void)
+static int createOracleSession(OCI_CONNECTION *cObj, OCI_SESSION *sObj)
+{
+sword rc = OCI_SUCCESS;
+
+  rc = OCIHandleAlloc(cObj->oraEnv, (void*)&sObj->oraError, OCI_HTYPE_ERROR, 0, (dvoid **)0);
+  if (rc) return oraErrorHandler(rc, NULL);
+  rc = OCIHandleAlloc(cObj->oraEnv, (void*)&sObj->oraSvcCtx, OCI_HTYPE_SVCCTX, 0, (dvoid **)0);
+  if (rc) return oraErrorHandler(rc, NULL);
+  rc = OCIAttrSet(sObj->oraSvcCtx, OCI_HTYPE_SVCCTX, cObj->oraServer, (ub4) 0, OCI_ATTR_SERVER, sObj->oraError);
+  if (rc) return oraErrorHandler(rc, sObj->oraError);
+  rc = OCIHandleAlloc(cObj->oraEnv, (void*)&sObj->oraSession, OCI_HTYPE_SESSION, 0, (dvoid **) 0);
+  if (rc) return oraErrorHandler(rc, NULL);
+  rc = OCIAttrSet(sObj->oraSession, OCI_HTYPE_SESSION, (OraText *)sObj->username, (sb4)strlen(sObj->username),
+    OCI_ATTR_USERNAME, sObj->oraError);
+  if (rc) return oraErrorHandler(rc, sObj->oraError);
+  rc = OCIAttrSet(sObj->oraSession, OCI_HTYPE_SESSION, (OraText *)sObj->password,
+    (sb4)strlen(sObj->password), OCI_ATTR_PASSWORD, sObj->oraError);
+  if (rc) return oraErrorHandler(rc, sObj->oraError);
+
+  rc = OCISessionBegin(sObj->oraSvcCtx, sObj->oraError, sObj->oraSession, OCI_CRED_RDBMS, OCI_DEFAULT);
+  if (rc)
+  {
+    oraErrorHandler(rc, sObj->oraError);
+    if (OCI_SUCCESS_WITH_INFO != rc) return(E_OCI_ERROR);
+  }
+
+  rc = OCIAttrSet(sObj->oraSvcCtx, OCI_HTYPE_SVCCTX, sObj->oraSession, (ub4) 0, OCI_ATTR_SESSION, sObj->oraError);
+  if (rc) return oraErrorHandler(rc, sObj->oraError);
+
+  return E_SUCCESS;
+}
+
+static int dropOracleSession(OCI_SESSION *sObj)
+{
+sword rc = OCI_SUCCESS;
+
+  rc = OCISessionEnd(sObj->oraSvcCtx, sObj->oraError, sObj->oraSession, OCI_DEFAULT);
+  if (rc) return oraErrorHandler(rc, sObj->oraError);
+  if (sObj->oraSession) rc = OCIHandleFree(sObj->oraSession, OCI_HTYPE_SESSION);
+  if (rc) return oraErrorHandler(rc, sObj->oraError);
+  if (sObj->oraSvcCtx) rc = OCIHandleFree(sObj->oraSvcCtx, OCI_HTYPE_SVCCTX);
+  if (rc) return oraErrorHandler(rc, sObj->oraError);
+  if (sObj->oraError) rc = OCIHandleFree(sObj->oraError, OCI_HTYPE_ERROR);
+  if (rc) return oraErrorHandler(rc, sObj->oraError);
+
+  return E_SUCCESS;
+}
+
+static int disconnectFromOracleAction(OCI_CONNECTION *cObj)
+{
+sword rc = OCI_SUCCESS;
+OCIError *oraError = NULL;
+
+  rc = OCIHandleAlloc(cObj->oraEnv, (void*)&oraError, OCI_HTYPE_ERROR, 0, (dvoid **)0);
+  if (rc) return oraErrorHandler(rc, NULL);
+
+  rc = OCIServerDetach(cObj->oraServer, oraError, OCI_DEFAULT);
+  if (rc) return oraErrorHandler(rc, oraError);
+  if (cObj->oraServer) rc = OCIHandleFree(cObj->oraServer, OCI_HTYPE_SERVER);
+  if (rc) return oraErrorHandler(rc, NULL);
+  if (oraError) rc = OCIHandleFree(oraError, OCI_HTYPE_ERROR);
+  if (rc) return oraErrorHandler(rc, NULL);
+  if (cObj->oraEnv) rc = OCITerminate(OCI_DEFAULT);
+  if (rc) return oraErrorHandler(rc, NULL);
+
+  return E_SUCCESS;
+}
+
+int connectToDatabase(char *hostName)
 {
 int rc = E_SUCCESS;
 cJSON *jsonParms = NULL, *item = NULL;
 
   logOutput(LOG_OUTPUT_ALWAYS, "Connecting to the database...");
 
-  bzero(&dbConn, sizeof(dbConn));
-  osStrcpy(dbConn.database, databaseName, sizeof(dbConn.database));
+  strncpy(dbConn.database, envDatabaseName ? envDatabaseName : configDatabaseName, sizeof(dbConn.database)-1);
+  dbConn.database[sizeof(dbConn.database)-1] = '\0';
   rc = connectToOracleAction(&dbConn);
   if (rc) return errorHandler(rc, NULL);
 
-  bzero(&qConn, sizeof(qConn));
-  osStrcpy(qConn.database, databaseName, sizeof(qConn.database));
+  strncpy(qConn.database, envDatabaseName ? envDatabaseName : configDatabaseName, sizeof(qConn.database)-1);
+  qConn.database[sizeof(qConn.database)-1] = '\0';
   rc = connectToOracleAction(&qConn);
   if (rc) return errorHandler(rc, NULL);
 
-  bzero(&qSess, sizeof(qSess));
-  osStrcpy(qSess.username, runtimeUser, sizeof(qSess.username));
-  osStrcpy(qSess.password, runtimePassword, sizeof(qSess.password));
+  strncpy(qSess.username, envUser ? envUser : configUser, sizeof(qSess.username)-1);
+  qSess.username[sizeof(qSess.username)-1] = '\0';
+  strncpy(qSess.password, envPassword ? envPassword : configPassword, sizeof(qSess.password)-1);
+  qSess.password[sizeof(qSess.password)-1] = '\0';
   rc = createOracleSession(&qConn, &qSess);
   if (rc) return errorHandler(rc, NULL);
 
-  bzero(&dbSess, sizeof(OCI_SESSION));
-  osStrcpy(dbSess.username, runtimeUser, sizeof(dbSess.username));
-  osStrcpy(dbSess.password, runtimePassword, sizeof(dbSess.password));
+  strncpy(dbSess.username, envUser ? envUser : configUser, sizeof(dbSess.username)-1);
+  dbSess.username[sizeof(dbSess.username)-1] = '\0';
+  strncpy(dbSess.password, envPassword ? envPassword : configPassword, sizeof(dbSess.password)-1);
+  dbSess.password[sizeof(dbSess.password)-1] = '\0';
   rc = createOracleSession(&dbConn, &dbSess);
   if (rc) return errorHandler(rc, NULL);
 
@@ -118,7 +320,7 @@ cJSON *jsonParms = NULL, *item = NULL;
   if (rc) return errorHandler(rc, dbSess.oraError);
 
   rc = OCIBindByName(dbConnStmt, &hostNameBV, dbSess.oraError, (const OraText *)":hostName", -1,
-    hostName, (ub4) sizeof(hostName)-1, SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0,
+    hostName, (ub4) strlen(hostName)+1, SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0,
     (ub4 *) 0, (sb4) OCI_DEFAULT);
   if (rc) return errorHandler(rc, dbSess.oraError);
 
@@ -142,7 +344,7 @@ cJSON *jsonParms = NULL, *item = NULL;
   if (jsonParms) cJSON_Delete(jsonParms);
 
   rc = OCIBindByName(qConnStmt, &hostNameBV, dbSess.oraError, (const OraText *)":hostName", -1,
-    hostName, (ub4) sizeof(hostName)-1, SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0,
+    hostName, (ub4) strlen(hostName)+1, SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0,
     (ub4 *) 0, (sb4) OCI_DEFAULT);
   if (rc) return errorHandler(rc, dbSess.oraError);
 
