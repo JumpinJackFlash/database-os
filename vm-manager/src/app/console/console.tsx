@@ -104,9 +104,6 @@ export default function Console({ osVariants, isoImages, qcow2Images, vmImages, 
                 <Button color="danger" variant="light" onPress={onCreateVmModalClose}>
                   Close
                 </Button>
-                <Button color="primary" onPress={onCreateVmModalClose}>
-                  Action
-                </Button>
               </ModalFooter>
             </>
           )}
@@ -121,7 +118,6 @@ export default function Console({ osVariants, isoImages, qcow2Images, vmImages, 
         <div className=" max-w-screen-md flex-col gap-4 rounded-large px-8 pb-10 pt-6">
           <VirtualMachines vmImages={virtualMachines} refreshVirtualMachineList={refreshVirtualMachineList} />
           <div>
-            <Button color="primary" onPress={refreshVirtualMachineList}>Refresh</Button>
             <Button color="success" onPress={onCreateVmModalOpen}>New VM</Button>
           </div>
           <Divider className="m-4 max-w-screen-md" />

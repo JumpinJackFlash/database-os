@@ -98,6 +98,102 @@ static char *decodeState(int state)
   }
 }
 
+static char *decodeShutdownDetail(int detail)
+{
+  switch (detail)
+  {
+    case VIR_DOMAIN_EVENT_SHUTDOWN_FINISHED:
+      return "shutdown finished";
+
+    case VIR_DOMAIN_EVENT_SHUTDOWN_GUEST:
+      return "guest initiated";
+
+    case VIR_DOMAIN_EVENT_SHUTDOWN_HOST:
+      return "host initiated";
+
+    default:
+      return "unknown";
+  }
+}
+
+static char *decodeStoppedDetail(int detail)
+{
+  switch (detail)
+  {
+    case VIR_DOMAIN_EVENT_STOPPED_SHUTDOWN:
+      return "normal shutdown";
+
+    case VIR_DOMAIN_EVENT_STOPPED_DESTROYED:
+      return "host poweroff";
+
+    case VIR_DOMAIN_EVENT_STOPPED_CRASHED:
+      return "guest crashed";
+
+    case VIR_DOMAIN_EVENT_STOPPED_MIGRATED:
+      return "migrated";
+
+    case VIR_DOMAIN_EVENT_STOPPED_SAVED:
+      return "saved";
+
+    case VIR_DOMAIN_EVENT_STOPPED_FAILED:
+      return "host failed";
+
+    case VIR_DOMAIN_EVENT_STOPPED_FROM_SNAPSHOT:
+      return "snapshot loaded";
+
+    default:
+      return "unknown";
+  }
+}
+
+static char *decodeStartupDetail(int detail)
+{
+  switch (detail)
+  {
+    case VIR_DOMAIN_EVENT_STARTED_BOOTED:
+      return "normal startup";
+
+    case VIR_DOMAIN_EVENT_STARTED_MIGRATED:
+      return "incoming migration";
+
+    case VIR_DOMAIN_EVENT_STARTED_RESTORED:
+      return "restored state";
+
+    case VIR_DOMAIN_EVENT_STARTED_FROM_SNAPSHOT:
+      return "restored snapshot";
+
+    case VIR_DOMAIN_EVENT_STARTED_WAKEUP:
+      return "wakeup event";
+
+    default:
+      return "unknown";
+  }
+}
+
+static char *decodeResumedDetail(int detail)
+{
+  switch (detail)
+  {
+    case VIR_DOMAIN_EVENT_RESUMED_UNPAUSED:
+      return "normal resume";
+
+    case VIR_DOMAIN_EVENT_RESUMED_MIGRATED:
+      return "migration complete";
+
+    case VIR_DOMAIN_EVENT_RESUMED_FROM_SNAPSHOT:
+      return "snapshot complete";
+
+    case VIR_DOMAIN_EVENT_RESUMED_POSTCOPY:
+      return "migration running";
+
+    case VIR_DOMAIN_EVENT_RESUMED_POSTCOPY_FAILED:
+      return "migration failed";
+
+    default:
+      return "unknown";
+  }
+}
+
 void *getVirtualDomain(char *machineName)
 {
 int rc = E_SUCCESS, x = 0, state = 0, reason = 0;
@@ -357,16 +453,24 @@ const char *domainName = NULL;
 
   switch (event)
   {
+    case VIR_DOMAIN_EVENT_RESUMED:
+      logOutput(LOG_OUTPUT_ALWAYS, decodeResumedDetail(detail));
+      updateLifecycleState((char *) domainName, "starting", decodeResumedDetail(detail));
+      break;
+
     case VIR_DOMAIN_EVENT_STARTED:
-      updateLifecycleState((char *) domainName, "starting");
+      logOutput(LOG_OUTPUT_ALWAYS, decodeStartupDetail(detail));
+      updateLifecycleState((char *) domainName, "running", decodeStartupDetail(detail));
       break;
 
     case VIR_DOMAIN_EVENT_SHUTDOWN:
-      updateLifecycleState((char *) domainName, "stopping");
+      logOutput(LOG_OUTPUT_ALWAYS, decodeShutdownDetail(detail));
+      updateLifecycleState((char *) domainName, "stopping", decodeShutdownDetail(detail));
       break;
 
     case VIR_DOMAIN_EVENT_STOPPED:
-      updateLifecycleState((char *) domainName, "stopped");
+      logOutput(LOG_OUTPUT_ALWAYS, decodeStoppedDetail(detail));
+      updateLifecycleState((char *) domainName, "stopped", decodeStoppedDetail(detail));
       break;
 
     case VIR_DOMAIN_EVENT_UNDEFINED:

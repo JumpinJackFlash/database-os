@@ -434,7 +434,7 @@ exit_point:
   return rc;
 }
 
-int updateLifecycleState(char *machineName, char *lifecycleState)
+int updateLifecycleState(char *machineName, char *lifecycleState, char *detail)
 {
 cJSON *jsonParms = NULL, *jsonObject = NULL, *item = NULL;
 int rc = E_SUCCESS;
@@ -457,6 +457,9 @@ int rc = E_SUCCESS;
   item = cJSON_AddStringToObject(jsonObject, "lifecycleState", lifecycleState);
   if (!item) return jsonError("lifecycleState");
 
+  item = cJSON_AddStringToObject(jsonObject, "detail", detail);
+  if (!item) return jsonError("detail");
+
   rc = cJSON_AddItemToObject(jsonParms, "messagePayload", jsonObject);
   if (!rc) return jsonError("messagePayload");
 
@@ -466,6 +469,8 @@ int rc = E_SUCCESS;
     rc = E_MALLOC;
     goto exit_point;
   }
+
+  logOutput(LOG_OUTPUT_VERBOSE, jsonParametersStr);
 
   pthread_mutex_lock(&dbConnMtx);
 

@@ -61,16 +61,6 @@ export default function VirtualMachines({ virtualMachine, refreshVirtualMachineL
 
   }
 
-  function undefineVirtualMachineHandler(virtualMachineId: number)
-  {
-    undefineVirtualMachine(virtualMachineId).then((response) =>
-    {
-      if (!response.ok) return vmManagerContext?.showErrorModal(response.jsonData.errorMessage);
-      addToast({ color: 'primary', title: "VM Undefined" });
-    })
-  }
-
-  console.log(virtualMachine);
   return(
     <ModalBody>
       <div className="columns-3 flex gap-5">
