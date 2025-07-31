@@ -434,7 +434,7 @@ exit_point:
   return rc;
 }
 
-int updateLifecycleState(char *machineName, char *lifecycleState, char *detail)
+int updateLifecycleState(char *machineName, char *lifecycleState, char *detail, char *xmlDescription)
 {
 cJSON *jsonParms = NULL, *jsonObject = NULL, *item = NULL;
 int rc = E_SUCCESS;
@@ -459,6 +459,12 @@ int rc = E_SUCCESS;
 
   item = cJSON_AddStringToObject(jsonObject, "detail", detail);
   if (!item) return jsonError("detail");
+
+  if (xmlDescription)
+  {
+    item = cJSON_AddStringToObject(jsonObject, "xmlDescription", xmlDescription);
+    if (!item) return jsonError("detail");
+  }
 
   rc = cJSON_AddItemToObject(jsonParms, "messagePayload", jsonObject);
   if (!rc) return jsonError("messagePayload");

@@ -20,6 +20,81 @@ package body vm_manager as
   ROOT_USER                           constant varchar2(9) := 'root:root';
   QEMU_USER                           constant varchar2(9) := 'qemu:qemu';
 
+  function get_disks
+  (
+    p_xml_description                 virtual_machines.xml_description%type
+  )
+  return json_array_t
+
+  is
+
+    l_json_array                      json_array_t := json_array_t;
+    l_xml_doc                         dbms_xmldom.DOMDocument;
+    l_xml_element                     dbms_xmldom.DOMElement;
+    l_node_list                       dbms_xmldom.DOMNodelist;
+    l_node                            dbms_xmldom.DOMNode;
+    l_node_name                       varchar2(256);
+    l_attributes                      dbms_xmldom.DOMNamedNodeMap;
+    l_attribute                       dbms_xmldom.DOMAttr;
+    l_node_value                      clob;
+    l_length                          pls_integer;
+
+  begin
+
+    l_xml_doc := dbms_xmldom.newDOMDocument(p_xml_description);
+    l_xml_element := dbms_xmldom.getDocumentElement(l_xml_doc);
+
+    l_node_list := dbms_xmldom.getElementsByTagName(l_xml_element, 'source');
+    l_length := DBMS_XMLDOM.getLength(l_node_list);
+
+    for i in 0 .. l_length - 1 loop
+
+      l_node := dbms_xmldom.item(l_node_list, i);
+      l_node_name := dbms_xmldom.getnodename(l_node);
+      l_node_value := dbms_xmldom.getnodevalue(l_node);
+
+      l_attributes := dbms_xmldom.getattributes(l_node);
+      l_node := dbms_xmldom.getnameditem(l_attributes, 'file');
+
+      if not dbms_xmldom.isnull(l_node) then
+
+        l_attribute := dbms_xmldom.makeattr(l_node);
+
+        l_node_value := dbms_xmldom.getvalue(l_attribute);
+
+        l_json_array.append(l_node_value);
+
+      end if;
+
+    end loop;
+
+    dbms_xmldom.freedocument(l_xml_doc);
+
+    return l_json_array;
+
+  end get_disks;
+
+  function get_disks
+  (
+    p_virtual_machine_id              virtual_machines.virtual_machine_id%type
+  )
+  return json_array_t
+
+  is
+
+    l_xml_description                 virtual_machines.xml_description%type;
+
+  begin
+
+    select  xml_description
+      into  l_xml_description
+      from  virtual_machines
+     where  virtual_machine_id = p_virtual_machine_id;
+
+    return get_disks(l_xml_description);
+
+  end get_disks;
+
   function get_message_for_client
   (
     p_timeout                         pls_integer default 60
@@ -85,6 +160,76 @@ package body vm_manager as
 
   end send_message_to_host_monitor;
 
+  procedure validate_lifecycle_state
+  (
+    p_lifecycle_state                 virtual_machines.lifecycle_state%type,
+    p_state_detail                    virtual_machines.state_detail%type,
+    p_next_lifecycle_state            virtual_machines.lifecycle_state%type,
+    p_next_state_detail               virtual_machines.state_detail%type
+  )
+
+  is
+
+  begin
+
+    case p_next_lifecycle_state
+
+      when 'starting' then
+
+        if 'start' = p_lifecycle_state or 'starting' = p_lifecycle_state or 'crashed' = p_lifecycle_state then
+
+          return;
+
+        end if;
+
+      when 'running' then
+
+        if 'starting' = p_lifecycle_state then
+
+          return;
+
+        end if;
+
+      when 'stop' then
+
+        if 'running' = p_lifecycle_state then
+
+          return;
+
+        end if;
+
+      when 'stopping' then
+
+        if 'stop' = p_lifecycle_state then
+
+          return;
+
+        end if;
+
+        if 'running' = p_lifecycle_state and p_next_state_detail in ('guest initiated', 'host initiated') then
+
+          return;
+
+        end if;
+
+      when 'stopped' then
+
+        if 'stopping' = p_lifecycle_state then
+
+          return;
+
+        end if;
+
+      when 'crashed' then
+
+        return;
+
+    end case;
+
+    raise_application_error(-20100, 'Invalid lifecycle transition: '||p_lifecycle_state||' --> '||p_next_lifecycle_state);
+
+  end validate_lifecycle_state;
+
 ---
 ---
 ---
@@ -120,6 +265,8 @@ package body vm_manager as
     l_attributes := dbms_xmldom.getattributes(l_node);
     l_node := dbms_xmldom.getnameditem(l_attributes, 'num');
     l_attribute := dbms_xmldom.makeattr(l_node);
+    dbms_xmldom.freedocument(l_xml_doc);
+
     return to_number(dbms_xmldom.getvalue(l_attribute));
 
   end get_cpu_count;
@@ -162,6 +309,8 @@ package body vm_manager as
       l_installed_memory := l_installed_memory + to_number(substr(dbms_xmldom.getnodevalue(l_child), 1, instr(dbms_xmldom.getnodevalue(l_child), ' ')));
 
     end loop;
+
+    dbms_xmldom.freedocument(l_xml_doc);
 
     return l_installed_memory;
 
@@ -1160,6 +1309,63 @@ package body vm_manager as
 
   end import_virtual_machine;
 
+  procedure register_vm_host
+  (
+    p_host_name                       vm_hosts.host_name%type,
+    p_json_parameters                 json_object_t
+  )
+
+  is
+
+    l_sysinfo                         clob := db_twig.get_clob(p_json_parameters, 'sysInfo');
+    l_host_capabilities               clob := db_twig.get_clob(p_json_parameters, 'hostCapabilities');
+    l_hypervisor_version              vm_hosts.hypervisor_version%type := db_twig.get_number(p_json_parameters, 'hypervisorVersion');
+    l_libvirt_version                 vm_hosts.libvirt_version%type := db_twig.get_number(p_json_parameters, 'libvirtVersion');
+    l_os_release                      vm_hosts.os_release%type := db_twig.get_string(p_json_parameters, 'osRelease');
+    l_machine_type                    vm_hosts.machine_type%type := db_twig.get_string(p_json_parameters, 'machineType');
+
+  begin
+
+    insert into vm_hosts
+      (host_id, host_name, status, last_update, sysinfo, host_capabilities, hypervisor_version, libvirt_version,
+       os_release, machine_type)
+    values
+      (id_seq.nextval, p_host_name, 'online', systimestamp at time zone 'utc', xmltype(l_sysinfo), xmltype(l_host_capabilities),
+       l_hypervisor_version, l_libvirt_version, l_os_release, l_machine_type);
+
+  exception
+
+  when dup_val_on_index then
+
+    update  vm_hosts
+       set  status = 'online',
+            sysinfo = xmltype(l_sysinfo),
+            last_update = systimestamp at time zone 'utc',
+            host_capabilities = xmltype(l_host_capabilities),
+            hypervisor_version = l_hypervisor_version,
+            libvirt_version = l_libvirt_version,
+            os_release = l_os_release,
+            machine_type = l_machine_type
+     where  host_name = p_host_name;
+
+  end register_vm_host;
+
+  procedure set_vm_host_offline
+  (
+    p_host_name                       vm_hosts.host_name%type
+  )
+
+  is
+
+  begin
+
+    update  vm_hosts
+       set  status = 'offline',
+            last_update = systimestamp at time zone 'utc'
+     where  host_name = p_host_name;
+
+  end set_vm_host_offline;
+
   procedure start_virtual_machine
   (
     p_session_id                      varchar2,
@@ -1258,6 +1464,144 @@ package body vm_manager as
     send_message_to_host_monitor(l_dbos_message);
 
   end undefine_virtual_machine;
+
+  procedure update_lifecycle_state
+  (
+    p_host_name                       vm_hosts.host_name%type,
+    p_json_parameters                 json_object_t
+  )
+
+  is
+
+    l_message_payload                 json_object_t := db_twig.get_object(p_json_parameters, 'messagePayload');
+    l_machine_name                    virtual_machines.machine_name%type := db_twig.get_string(l_message_payload, 'machineName');
+    l_lifecycle_state                 virtual_machines.lifecycle_state%type := db_twig.get_string(l_message_payload, 'lifecycleState');
+    l_state_detail                    virtual_machines.state_detail%type := db_twig.get_string(l_message_payload, 'detail');
+    l_xml_description                 clob;
+    l_disks                           json_array_t;
+
+    l_virtual_machine                 virtual_machines%rowtype;
+
+  begin
+
+    select  *
+      into  l_virtual_machine
+      from  virtual_machines
+     where  machine_name = l_machine_name;
+
+    validate_lifecycle_state(l_virtual_machine.lifecycle_state, l_virtual_machine.state_detail, l_lifecycle_state, l_state_detail);
+
+    if l_lifecycle_state in ('running', 'stopping') then
+
+      l_xml_description := db_twig.get_clob(l_message_payload, 'xmlDescription');
+      l_virtual_machine.xml_description := xmltype(l_xml_description);
+
+    end if;
+
+    update  virtual_machines
+       set  lifecycle_state = l_lifecycle_state,
+            state_detail = l_state_detail,
+            xml_description = l_virtual_machine.xml_description
+     where  machine_name = l_machine_name;
+
+    if 'stopped' = l_lifecycle_state then
+
+      l_disks := get_disks(l_virtual_machine.xml_description);
+
+      for i in 0 .. l_disks.get_size - 1 loop
+
+        dgbunker_service.invalidate_obscure_filename(l_disks.get_string(i));
+
+      end loop;
+
+    end if;
+
+  end update_lifecycle_state;
+
+  procedure update_persistence
+  (
+    p_host_name                       vm_hosts.host_name%type,
+    p_json_parameters                 json_object_t
+  )
+
+  is
+
+    l_message_payload                 json_object_t := db_twig.get_object(p_json_parameters, 'messagePayload');
+    l_machine_name                    virtual_machines.machine_name%type := db_twig.get_string(l_message_payload, 'machineName');
+    l_persistent                      virtual_machines.persistent%type := db_twig.get_string(l_message_payload, 'persistent');
+
+  begin
+
+    update  virtual_machines
+       set  persistent = l_persistent
+     where  machine_name = l_machine_name;
+
+  end update_persistence;
+
+  procedure update_vm_state
+  (
+    p_host_name                       vm_hosts.host_name%type,
+    p_json_parameters                 json_object_t
+  )
+
+  is
+
+    l_machine_name                    virtual_machines.machine_name%type := db_twig.get_string(p_json_parameters, 'machineName');
+    l_uuid                            virtual_machines.uuid%type := db_twig.get_string(p_json_parameters, 'uuid');
+    l_persistent                      virtual_machines.persistent%type := db_twig.get_string(p_json_parameters, 'persistent');
+    l_interfaces_array                json_array_t := db_twig.get_array(p_json_parameters, 'interfaces');
+    l_interfaces                      virtual_machines.interfaces%type := l_interfaces_array.to_clob;
+    l_lifecycle_state                 virtual_machines.lifecycle_state%type := db_twig.get_string(p_json_parameters, 'lifecycleState');
+
+  begin
+
+    update  virtual_machines
+       set  uuid = l_uuid,
+            persistent = l_persistent,
+            interfaces = l_interfaces,
+            lifecycle_state = l_lifecycle_state
+    where   machine_name = l_machine_name;
+
+  end update_vm_state;
+
+  procedure validate_vm_state
+  (
+    p_host_name                       vm_hosts.host_name%type,
+    p_json_parameters                 json_object_t
+  )
+
+  is
+
+    l_machine_name                    virtual_machines.machine_name%type := db_twig.get_string(p_json_parameters, 'machineName');
+    l_uuid                            virtual_machines.uuid%type := db_twig.get_string(p_json_parameters, 'uuid');
+    l_persistent                      virtual_machines.persistent%type := db_twig.get_string(p_json_parameters, 'persistent');
+    l_interfaces                      json_array_t := db_twig.get_array(p_json_parameters, 'interfaces');
+    l_lifecycle_state                 virtual_machines.lifecycle_state%type := db_twig.get_string(p_json_parameters, 'lifecycleState');
+    l_virtual_machine                 virtual_machines%rowtype;
+
+  begin
+
+    select  *
+      into  l_virtual_machine
+      from  virtual_machines
+     where  machine_name = l_machine_name;
+
+    if l_virtual_machine.uuid != l_uuid or
+       l_virtual_machine.persistent != l_persistent or
+       l_virtual_machine.interfaces != l_interfaces.to_string or
+       l_virtual_machine.lifecycle_state != l_lifecycle_state then
+
+      raise_application_error(vm_manager.VM_STATE_MISMATCH, vm_manager.VM_STATE_MISMATCH_EMSG);
+
+    end if;
+
+  exception
+
+  when no_data_found then
+
+    raise_application_error(vm_manager.UNAUTHORIZED_VM_DETECTED, vm_manager.UNAUTHORIZED_VM_DETECTED_EMSG||' - '||p_host_name||':'||l_machine_name);
+
+  end validate_vm_state;
 
 end vm_manager;
 /

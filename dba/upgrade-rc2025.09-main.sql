@@ -81,14 +81,18 @@ alter table virtual_machines add host_id number(7) references vm_hosts(host_id);
 alter table virtual_machines add uuid varchar2(36) unique;
 alter table virtual_machines add persistent varchar2(1) default 'N' not null constraint persistent_chk check (persistent in ('Y', 'N'));
 alter table virtual_machines add interfaces clob constraint interfaces_chk check(interfaces is json);
+
 alter table virtual_machines add lifecycle_state varchar2(11) default 'stopped' not null
   constraint lifecycle_state_chk check (lifecycle_state in ('unknown', 'start', 'starting', 'running', 'blocked', 'pausing', 'paused', 'stop', 
       'stopping', 'stopped', 'crashed', 'pmsuspended'));
+
 alter table virtual_machines add state_detail varchar2(30) default 'unknown' not null
     constraint state_detail_chk check (state_detail in ('unknown', 'shutdown finished', 'guest initiated', 'host initiated', 
       'normal shutdown', 'host poweroff', 'guest crashed', 'migrated', 'saved', 'host failed', 'snapshot loaded', 'normal startup', 
       'incoming migration', 'restored state', 'restored snapshot', 'wakeup event', 'normal resume', 'migration complete', 
-      'snapshot complete', 'migration running', 'migration failed'));
+      'snapshot complete', 'migration running', 'migration failed', 'startup requested', 'install failed'));
+
+alter table virtual_machines add xml_description xmltype;
 
 REM  ...and here
 

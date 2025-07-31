@@ -196,6 +196,17 @@ as
     p_network_device                  virtual_machines.network_device%type default 'default'
   );
 
+  procedure register_vm_host
+  (
+    p_host_name                       vm_hosts.host_name%type,
+    p_json_parameters                 json_object_t
+  );
+
+  procedure set_vm_host_offline
+  (
+    p_host_name                       vm_hosts.host_name%type
+  );
+
   procedure start_virtual_machine
   (
     p_session_id                      varchar2,
@@ -211,6 +222,30 @@ as
   procedure undefine_virtual_machine
   (
     p_virtual_machine_id              virtual_machines.virtual_machine_id%type
+  );
+
+  procedure update_lifecycle_state
+  (
+    p_host_name                       vm_hosts.host_name%type,
+    p_json_parameters                 json_object_t
+  );
+
+  procedure update_persistence
+  (
+    p_host_name                       vm_hosts.host_name%type,
+    p_json_parameters                 json_object_t
+  );
+
+  procedure update_vm_state
+  (
+    p_host_name                       vm_hosts.host_name%type,
+    p_json_parameters                 json_object_t
+  );
+
+  procedure validate_vm_state
+  (
+    p_host_name                       vm_hosts.host_name%type,
+    p_json_parameters                 json_object_t
   );
 
 end vm_manager;

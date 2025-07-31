@@ -446,6 +446,7 @@ struct utsname utsnameBuffer;
 static int domainEventHandler(virConnect *conn, virDomain *domain, int event, int detail, void *opaque)
 {
 const char *domainName = NULL;
+char *xmlDesc = NULL;
 
   domainName = virDomainGetName(domain);
   logOutput(LOG_OUTPUT_ALWAYS, (char *) domainName);
@@ -455,22 +456,26 @@ const char *domainName = NULL;
   {
     case VIR_DOMAIN_EVENT_RESUMED:
       logOutput(LOG_OUTPUT_ALWAYS, decodeResumedDetail(detail));
-      updateLifecycleState((char *) domainName, "starting", decodeResumedDetail(detail));
+      updateLifecycleState((char *) domainName, "starting", decodeResumedDetail(detail), NULL);
       break;
 
     case VIR_DOMAIN_EVENT_STARTED:
       logOutput(LOG_OUTPUT_ALWAYS, decodeStartupDetail(detail));
-      updateLifecycleState((char *) domainName, "running", decodeStartupDetail(detail));
+      xmlDesc = virDomainGetXMLDesc(domain, 0);
+      updateLifecycleState((char *) domainName, "running", decodeStartupDetail(detail), xmlDesc);
+      free(xmlDesc);
       break;
 
     case VIR_DOMAIN_EVENT_SHUTDOWN:
       logOutput(LOG_OUTPUT_ALWAYS, decodeShutdownDetail(detail));
-      updateLifecycleState((char *) domainName, "stopping", decodeShutdownDetail(detail));
+      xmlDesc = virDomainGetXMLDesc(domain, 0);
+      updateLifecycleState((char *) domainName, "stopping", decodeShutdownDetail(detail), xmlDesc);
+      free(xmlDesc);
       break;
 
     case VIR_DOMAIN_EVENT_STOPPED:
       logOutput(LOG_OUTPUT_ALWAYS, decodeStoppedDetail(detail));
-      updateLifecycleState((char *) domainName, "stopped", decodeStoppedDetail(detail));
+      updateLifecycleState((char *) domainName, "stopped", decodeStoppedDetail(detail), NULL);
       break;
 
     case VIR_DOMAIN_EVENT_UNDEFINED:

@@ -196,14 +196,14 @@ int startVirtualMachine(void)
 
   logOutput(LOG_OUTPUT_VERBOSE, commandLine);
 
-  updateLifecycleState(machineName, "starting", "startup requested");
+  updateLifecycleState(machineName, "starting", "startup requested", NULL);
 
   process = popen(commandLine, "r");
   if (!process)
   {
     snprintf(text2Log, sizeof(text2Log), "Unable to start VM: %s", strerror(errno));
     logOutput(LOG_OUTPUT_ERROR, text2Log);
-    updateLifecycleState(machineName, "crashed", "startup failed");
+    updateLifecycleState(machineName, "crashed", "startup failed", NULL);
     return E_PLUGIN_ERROR;
   }
 
@@ -213,7 +213,7 @@ int startVirtualMachine(void)
 
   if (!virtualMachineIsRunning(machineName))
   {
-    updateLifecycleState(machineName, "crashed", "install failed");
+    updateLifecycleState(machineName, "crashed", "install failed", NULL);
     return E_SUCCESS;
   }
 
