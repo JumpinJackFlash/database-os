@@ -15,6 +15,7 @@ as
   STOP_VM_MESSAGE                     constant pls_integer := 25;
   UNDEFINE_VM_MESSAGE                 constant pls_integer := 30;
   CREATE_CLOUD_INIT_CDROM_MESSAGE     constant pls_integer := 35;
+  DELETE_STORAGE_POOL_MESSAGE         constant pls_integer := 40;
 
 -- Error codes and messages. DbTwig has reserved -20000 to -20199. Start with -20200
 

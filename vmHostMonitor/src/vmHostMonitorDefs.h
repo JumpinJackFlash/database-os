@@ -88,6 +88,7 @@
 #define MSGT_STOP_VM                            25
 #define MSGT_UNDEFINE_VM                        30
 #define MSGT_CREATE_CLOUD_INIT_CDROM            35
+#define MSGT_DELETE_STORAGE_POOL                40
 
 #define LOG_OUTPUT_ALWAYS                       0
 #define LOG_OUTPUT_ERROR                        1

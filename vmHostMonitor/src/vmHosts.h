@@ -15,5 +15,6 @@ int setupEventLoop(void);
 int virtualMachineIsRunning(char *machineName);
 void *getVirtualDomain(char *machineName);
 int vmHostErrorHandler(void);
+int deleteStoragePool(void);
 
 #endif /* VMHOSTS_H_ */

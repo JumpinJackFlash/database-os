@@ -1479,7 +1479,9 @@ package body vm_manager as
     l_state_detail                    virtual_machines.state_detail%type := db_twig.get_string(l_message_payload, 'detail');
     l_xml_description                 clob;
     l_disks                           json_array_t;
+    l_dbos_message                    dbos$message_t;
 
+    l_json_parameters                 json_object_t := json_object_t;
     l_virtual_machine                 virtual_machines%rowtype;
 
   begin
@@ -1511,6 +1513,11 @@ package body vm_manager as
       for i in 0 .. l_disks.get_size - 1 loop
 
         dgbunker_service.invalidate_obscure_filename(l_disks.get_string(i));
+
+        l_json_parameters.put('storagePool', dgbunker_service.extract_group_key(l_disks.get_string(i)));
+        l_dbos_message := dbos$message_t(dbms_session.unique_session_id, p_host_name, vm_manager.DELETE_STORAGE_POOL_MESSAGE,
+          l_json_parameters.to_string);
+        send_message_to_host_monitor(l_dbos_message);
 
       end loop;
 

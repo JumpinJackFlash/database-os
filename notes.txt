@@ -229,7 +229,8 @@ qemu-img create -f qcow2 /mnt/dbObscuraOra/dev/DPYORUnzEjFNcDXEeEeMSacjNVVOUxrja
 
 Virtual Storage Pool Cleanup
 -----------------------------------------
-Use 'virsh pool-list --inactive --name' to generate a file of inactive pools.
+Use 'virsh pool-list --name' to generate a file pools.
+Use 'virsh pool-destroy ...' in a script to stop active pools.
 use 'virsh pool-undefine ....' in a script to remove inactive pools.
 
 Image Cleanup (to create a seed image from a VM)

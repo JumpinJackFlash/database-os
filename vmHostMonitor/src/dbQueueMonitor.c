@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <limits.h>
+#include <signal.h>
 
 #include <cjson/cJSON.h>
 
@@ -18,6 +19,7 @@
 #include "errors.h"
 #include "oraDataLayer.h"
 #include "logger.h"
+#include "vmHosts.h"
 #include "virtualMachines.h"
 
 static pthread_t queueThreadID;
@@ -60,6 +62,10 @@ wait_for_another:
       item = cJSON_AddStringToObject(responsePayload, "status", rc ? "failure" : "success");
       if (!item) return E_MALLOC;
       rc = sendMessageToClient();
+      break;
+
+    case MSGT_DELETE_STORAGE_POOL:
+      rc = deleteStoragePool();
       break;
   }
 

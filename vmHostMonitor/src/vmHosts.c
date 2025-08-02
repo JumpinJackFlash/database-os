@@ -461,14 +461,14 @@ char *xmlDesc = NULL;
 
     case VIR_DOMAIN_EVENT_STARTED:
       logOutput(LOG_OUTPUT_ALWAYS, decodeStartupDetail(detail));
-      xmlDesc = virDomainGetXMLDesc(domain, 0);
+      xmlDesc = virDomainGetXMLDesc(domain, VIR_DOMAIN_XML_INACTIVE);
       updateLifecycleState((char *) domainName, "running", decodeStartupDetail(detail), xmlDesc);
       free(xmlDesc);
       break;
 
     case VIR_DOMAIN_EVENT_SHUTDOWN:
       logOutput(LOG_OUTPUT_ALWAYS, decodeShutdownDetail(detail));
-      xmlDesc = virDomainGetXMLDesc(domain, 0);
+      xmlDesc = virDomainGetXMLDesc(domain, VIR_DOMAIN_XML_INACTIVE);
       updateLifecycleState((char *) domainName, "stopping", decodeShutdownDetail(detail), xmlDesc);
       free(xmlDesc);
       break;
@@ -514,4 +514,24 @@ void disconnectFromVmHost(void)
 {
   setVmHostOffline();
   virConnectClose(vmConnection);
+}
+
+int deleteStoragePool(void)
+{
+  cJSON *item = NULL;
+  int rc = E_SUCCESS;
+  virStoragePool *storagePool = NULL;
+
+  item = cJSON_GetObjectItemCaseSensitive(messagePayload, "storagePool");
+  if (!item) return jsonError("storagePool");
+
+  storagePool = virStoragePoolLookupByName(vmConnection, item->valuestring);
+
+  rc = virStoragePoolDestroy(storagePool);
+  rc = virStoragePoolDelete(storagePool, VIR_STORAGE_POOL_DELETE_NORMAL);
+  rc = virStoragePoolUndefine(storagePool);
+
+  virStoragePoolFree(storagePool);
+
+  return rc;
 }
