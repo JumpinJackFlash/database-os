@@ -1,11 +1,11 @@
 'use client'
 
-import { startVirtualMachine, stopVirtualMachine, undefineVirtualMachine } from "@/utils/serverFunctions";
+import { startVirtualMachine, stopVirtualMachine } from "@/utils/serverFunctions";
 import React, { useState, useCallback, useEffect, useContext } from "react";
 import { Table,  TableHeader,  TableBody,  TableColumn,  TableRow,  TableCell } from "@heroui/table";
 import { VirtualMachinesT, VirtualMachineT, RefreshVirtualMachineListT } from "@/utils/dataTypes";
 import { Button, addToast } from "@heroui/react";
-import {  Modal,  ModalContent,  ModalHeader,  ModalBody,  ModalFooter, useDisclosure } from "@heroui/modal";
+import {  Modal,  ModalContent,  ModalHeader,  ModalFooter, useDisclosure } from "@heroui/modal";
 
 import VirtualMachineDetails from './virtualMachineDetails';
 

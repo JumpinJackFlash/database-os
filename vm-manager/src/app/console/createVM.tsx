@@ -220,6 +220,7 @@ export default function CreateVM({ osVariants, isoImages, qcow2Images, refreshVi
               <div  className="columns-2 flex w-full flex-wrap md:flex-nowrap gap-4">
                 <Input value={isoVmImageName} onValueChange={setIsoVmImageName} label="VM Image Name"/>
                 <Select className="w-80" label="Select a VM Host Server" onChange={onChangeHandler.bind(onChangeHandler, setVmHostId)} selectedKeys={[vmHostId]}>
+                  {/* @ts-ignore */}
                   {vmHosts.map((vmHost) =>
                   (
                     <SelectItem className={"w-lg"} key={vmHost.hostId}>{vmHost.hostName}</SelectItem>
@@ -272,6 +273,7 @@ export default function CreateVM({ osVariants, isoImages, qcow2Images, refreshVi
               <div  className="columns-2 flex w-full flex-wrap md:flex-nowrap gap-4">
                 <Input value={qcowVmImageName} onValueChange={setQcowVmImageName} label="VM Image Name"/>
                 <Select className="w-80" label="Select a VM Host Server" onChange={onChangeHandler.bind(onChangeHandler, setVmHostId)} selectedKeys={[vmHostId]}>
+                  {/* @ts-ignore */}
                   {vmHosts.map((vmHost) =>
                   (
                     <SelectItem className={"w-lg"} key={vmHost.hostId}>{vmHost.hostName}</SelectItem>

@@ -155,3 +155,5 @@ package body vm_manager_runtime as
   end call_api;
 
 end vm_manager_runtime;
+/
+show errors package body vm_manager

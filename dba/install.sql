@@ -20,8 +20,8 @@ define elog_user = '&4'
 define icam_user = '&5'
 define dgbunker_user = '&6'
 define dbos_user = '&7'
-define runtime_user = '&8'
-define runtime_password = '&9'
+define runtime_user = 'dbos_runtime'
+define runtime_password = '#SecurityBySimplicity2020#'
 
 connect &dba_user@"&database_name";
 
@@ -94,6 +94,8 @@ create or replace synonym &dbos_user..api_errors for &elog_user..api_errors;
 grant execute on dbms_aq to &dbos_user;
 grant execute on dbms_aqadm to &dbos_user;
 
+alter session set current_schema = &dbos_user;
+
 create or replace type dbos$message_t as object
 (
   client_handle					      varchar2(24),
@@ -106,9 +108,7 @@ create or replace type dbos$message_t as object
 
 show errors type dbos$message_t
 
-@createQueue
-
-alter session set current_schema = &dbos_user;
+@createQueue &dbos_user
 
 create sequence id_seq minvalue 1 maxvalue 999999999999 cycle;
 

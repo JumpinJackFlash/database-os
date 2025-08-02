@@ -1,7 +1,7 @@
 'use client'
 
 import { formatTimestamp } from "@/utils/clientFunctions";
-import { startVirtualMachine, stopVirtualMachine, deleteVirtualMachine, undefineVirtualMachine } from "@/utils/serverFunctions";
+import { deleteVirtualMachine, undefineVirtualMachine } from "@/utils/serverFunctions";
 import { Checkbox,  Button } from "@heroui/react";
 import React, { useState, useContext } from "react";
 import { VirtualMachineT, RefreshVirtualMachineListT } from "@/utils/dataTypes";
