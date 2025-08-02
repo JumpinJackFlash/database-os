@@ -186,8 +186,8 @@ static char *decodeResumedDetail(int detail)
     case VIR_DOMAIN_EVENT_RESUMED_POSTCOPY:
       return "migration running";
 
-    case VIR_DOMAIN_EVENT_RESUMED_POSTCOPY_FAILED:
-      return "migration failed";
+/*    case VIR_DOMAIN_EVENT_RESUMED_POSTCOPY_FAILED:
+      return "migration failed"; */
 
     default:
       return "unknown";
