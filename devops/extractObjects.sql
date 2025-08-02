@@ -9,6 +9,9 @@ set echo on
 @extractPackageHeader vm_manager &git_home/database-os/dba
 @preWrapPackageBody vm_manager &git_home/database-os/dba
 
+@extractPackageHeader vm_manager_runtime &git_home/database-os/dba
+@preWrapPackageBody vm_manager_runtime &git_home/database-os/dba
+
 @extractPackageHeader restapi &git_home/database-os/dba
 @preWrapPackageBody restapi &git_home/database-os/dba
 
