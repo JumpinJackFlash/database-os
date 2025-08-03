@@ -86,6 +86,7 @@ export async function createUserSession(identification: string, password: string
 {
   const bodyData = { identification, password };
   const response = await callDbTwig('icam/createUserSession', bodyData);
+  console.log(response);
   if (response.ok) await createSessionCookie(response.jsonData.sessionId, response.jsonData.accountType);
   return response;
 }
@@ -152,16 +153,16 @@ export async function stopVirtualMachine(virtualMachineId: number)
   return response;
 }
 
-export async function undefineVirtualMachine(virtualMachineId: number)
-{
-  const bodyData = { virtualMachineId: virtualMachineId };
-  const response = await callDbTwig('dbos/undefineVirtualMachine', bodyData);
-  return response;
-}
-
 export async function terminateUserSession()
 {
   const response = await callDbTwig('icam/terminateUserSession');
   if (response.ok) await deleteSessionCookie();
+  return response;
+}
+
+export async function undefineVirtualMachine(virtualMachineId: number)
+{
+  const bodyData = { virtualMachineId: virtualMachineId };
+  const response = await callDbTwig('dbos/undefineVirtualMachine', bodyData);
   return response;
 }

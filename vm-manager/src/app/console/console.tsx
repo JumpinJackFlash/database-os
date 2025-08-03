@@ -43,7 +43,7 @@ export default function Console({ osVariants, isoImages, qcow2Images, vmImages, 
     terminateUserSession().then((response) =>
     {
       if (!response.ok) showErrorModal(response.jsonData.errorMessage)
-      router.push('/deleteCookie');
+      router.push('/login');
     });
   }
 
