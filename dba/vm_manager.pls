@@ -20,6 +20,107 @@ package body vm_manager as
   ROOT_USER                           constant varchar2(9) := 'root:root';
   QEMU_USER                           constant varchar2(9) := 'qemu:qemu';
 
+  procedure create_virtual_machine_action
+  (
+    p_session_id                      varchar2,
+    p_virtual_machine_id              virtual_machines.virtual_machine_id%type,
+    p_virtual_disk_size               number default 0,
+    p_sparse_disk_allocation          varchar2 default 'Y',
+    p_boot_device                     varchar2 default 'hd',
+    p_remove_cdrom_after_first_boot   varchar2 default 'Y',
+    p_first_boot                      varchar2 default 'N'
+  )
+
+  is
+
+    l_json_response                   json_object_t;
+    l_virtual_machine                 virtual_machines%rowtype;
+    l_json_parameters                 json_object_t := json_object_t;
+    l_object_id                       vault_objects.object_id%type;
+    l_object_created                  vault_objects.object_created%type;
+    l_dbos_message                    dbos$message_t;
+    l_host_name                       vm_hosts.host_name%type;
+    l_status                          vm_hosts.status%type;
+
+  begin
+
+    select  *
+      into  l_virtual_machine
+      from  virtual_machines
+     where  virtual_machine_id = p_virtual_machine_id;
+
+    select  host_name, status
+      into  l_host_name, l_status
+      from  vm_hosts
+     where  host_id = l_virtual_machine.host_id;
+
+    if 'online' != l_status then
+
+      raise_application_error(vm_manager.vm_host_offline, vm_manager.vm_host_offline_emsg);
+
+    end if;
+
+    select  object_created
+      into  l_object_created
+      from  vault_objects
+     where  object_id = l_virtual_machine.virtual_disk_id;
+
+--    g_plugin_process := dbplugin_api.connect_to_plugin_server(PLUGIN_MODULE);                    -- Connect to the dbplugin_api.
+
+    l_json_parameters.put('machineName', l_virtual_machine.machine_name);
+
+    if l_virtual_machine.virtual_disk_id is not null then
+
+      l_json_response := json_object_t(dgbunker_service.generate_object_filename(p_object_id => l_virtual_machine.virtual_disk_id,
+        p_gateway_name => l_host_name, p_access_mode => dgbunker_service.READ_WRITE_ACCESS,
+        p_linux_file_mode => VDISK_FILE_MODE, p_linux_subdir_mode => SUBDIR_FILE_MODE, p_disable_stream_write => 'Y',
+        p_access_limit => dgbunker_service.unlimited_access_operations, p_valid_until => dgbunker_service.NO_EXPIRATION,
+        p_file_user_group => ROOT_USER, p_subdir_user_group => ROOT_USER, p_session_id => p_session_id));
+
+      l_json_parameters.put('vDiskFilename', l_json_response.get_string('filename'));
+      if 'N' = l_object_created then
+
+        l_json_parameters.put('vDiskSize', p_virtual_disk_size);
+        l_json_parameters.put('sparseDiskAllocation', p_sparse_disk_allocation);
+
+      end if;
+
+    end if;
+
+    if l_virtual_machine.virtual_cdrom_id is not null then
+
+      l_json_response := json_object_t(dgbunker_service.generate_object_filename(p_object_id => l_virtual_machine.virtual_cdrom_id,
+        p_access_limit => dgbunker_service.UNLIMITED_ACCESS_OPERATIONS,
+        p_valid_until => dgbunker_service.NO_EXPIRATION, p_access_mode => dgbunker_service.READ_ACCESS,
+        p_linux_file_mode => VCDROM_FILE_MODE, p_linux_subdir_mode => SUBDIR_FILE_MODE, p_file_user_group => QEMU_USER, p_subdir_user_group => ROOT_USER,
+        p_gateway_name => l_host_name, p_session_id => p_session_id));
+
+      l_json_parameters.put('vCdromFilename', l_json_response.get_string('filename'));
+
+    end if;
+
+    l_json_parameters.put('vCpus', l_virtual_machine.vcpu_count);
+    l_json_parameters.put('vMemory', l_virtual_machine.virtual_memory);
+    l_json_parameters.put('osVariant', l_virtual_machine.os_variant);
+    l_json_parameters.put('networkSource', l_virtual_machine.network_source);
+    l_json_parameters.put('networkDevice', l_virtual_machine.network_device);
+    l_json_parameters.put('persistent', l_virtual_machine.persistent);
+    l_json_parameters.put('bootDevice', p_boot_device);
+
+    l_dbos_message := dbos$message_t(dbms_session.unique_session_id, l_host_name, vm_manager.START_VM_MESSAGE, l_json_parameters.to_string);
+    send_message_to_host_monitor(l_dbos_message);
+
+    if 'Y' = p_remove_cdrom_after_first_boot and
+       'Y' = p_first_boot and l_virtual_machine.virtual_cdrom_id is not null then
+
+      update  virtual_machines
+         set  virtual_cdrom_id = null
+       where  virtual_machine_id = p_virtual_machine_id;
+
+    end if;
+
+  end create_virtual_machine_action;
+
   function get_disks
   (
     p_xml_description                 virtual_machines.xml_description%type
@@ -131,7 +232,8 @@ package body vm_manager as
 
   procedure send_message_to_host_monitor
   (
-    p_message                         dbos$message_t)
+    p_message                         dbos$message_t
+  )
 
   as
 
@@ -159,6 +261,68 @@ package body vm_manager as
       msgid => l_message_handle);
 
   end send_message_to_host_monitor;
+
+  procedure set_obscure_vdisk
+  (
+    p_virtual_machine_id              virtual_machines.virtual_machine_id%type,
+    p_disk_number                     pls_integer,
+    p_obscure_filename                varchar2
+  )
+
+  is
+
+    l_xml_description                 virtual_machines.xml_description%type;
+    l_json_array                      json_array_t := json_array_t;
+    l_xml_doc                         dbms_xmldom.DOMDocument;
+    l_xml_element                     dbms_xmldom.DOMElement;
+    l_node_list                       dbms_xmldom.DOMNodelist;
+    l_node                            dbms_xmldom.DOMNode;
+    l_node_name                       varchar2(256);
+    l_attributes                      dbms_xmldom.DOMNamedNodeMap;
+    l_attribute                       dbms_xmldom.DOMAttr;
+    l_node_value                      clob;
+    l_xmltype                         xmltype;
+    l_length                          pls_integer;
+
+  begin
+
+    select  xml_description
+      into  l_xml_description
+      from  virtual_machines
+     where  virtual_machine_id = p_virtual_machine_id;
+
+    l_xml_doc := dbms_xmldom.newDOMDocument(l_xml_description);
+    l_xml_element := dbms_xmldom.getDocumentElement(l_xml_doc);
+
+    l_node_list := dbms_xmldom.getElementsByTagName(l_xml_element, 'source');
+    l_length := DBMS_XMLDOM.getLength(l_node_list);
+
+    l_node := dbms_xmldom.item(l_node_list, p_disk_number);
+    l_node_name := dbms_xmldom.getnodename(l_node);
+    l_node_value := dbms_xmldom.getnodevalue(l_node);
+
+    l_attributes := dbms_xmldom.getattributes(l_node);
+    l_node := dbms_xmldom.getnameditem(l_attributes, 'file');
+
+    if not dbms_xmldom.isnull(l_node) then
+
+      l_attribute := dbms_xmldom.makeattr(l_node);
+
+      dbms_xmldom.setvalue(l_attribute, p_obscure_filename);
+      l_node_value := dbms_xmldom.getvalue(l_attribute);
+
+
+    end if;
+
+    l_xmltype := dbms_xmldom.getxmltype(l_xml_doc);
+
+    dbms_xmldom.freedocument(l_xml_doc);
+
+    update  virtual_machines
+       set  xml_description = l_xmltype
+     where  virtual_machine_id = p_virtual_machine_id;
+
+  end set_obscure_vdisk;
 
   procedure validate_lifecycle_state
   (
@@ -236,6 +400,41 @@ package body vm_manager as
 
   function get_cpu_count
   (
+    p_host_capabilities               vm_hosts.host_capabilities%type
+  )
+  return pls_integer
+
+  is
+
+    l_xml_doc                         dbms_xmldom.DOMDocument;
+    l_xml_element                     dbms_xmldom.DOMElement;
+    l_node_list                       dbms_xmldom.DOMNodelist;
+    l_node                            dbms_xmldom.DOMNode;
+    l_attributes                      dbms_xmldom.DOMNamedNodeMap;
+    l_attribute                       dbms_xmldom.DOMAttr;
+    l_cpu_count                       pls_integer;
+
+  begin
+
+    l_xml_doc := dbms_xmldom.newDOMDocument(p_host_capabilities);
+    l_xml_element := dbms_xmldom.getDocumentElement(l_xml_doc);
+
+    l_node_list := dbms_xmldom.getElementsByTagName(l_xml_element, 'cpus');
+    l_node := dbms_xmldom.item(l_node_list, 0);
+    l_attributes := dbms_xmldom.getattributes(l_node);
+    l_node := dbms_xmldom.getnameditem(l_attributes, 'num');
+    l_attribute := dbms_xmldom.makeattr(l_node);
+
+    l_cpu_count := to_number(dbms_xmldom.getvalue(l_attribute));
+
+    dbms_xmldom.freedocument(l_xml_doc);
+
+    return l_cpu_count;
+
+  end get_cpu_count;
+
+  function get_cpu_count
+  (
     p_host_id                         vm_hosts.host_id%type
   )
   return pls_integer
@@ -243,12 +442,6 @@ package body vm_manager as
   is
 
     l_host_capabilities               vm_hosts.host_capabilities%type;
-    l_xml_doc                         dbms_xmldom.DOMDocument;
-    l_xml_element                     dbms_xmldom.DOMElement;
-    l_node_list                       dbms_xmldom.DOMNodelist;
-    l_node                            dbms_xmldom.DOMNode;
-    l_attributes                      dbms_xmldom.DOMNamedNodeMap;
-    l_attribute                       dbms_xmldom.DOMAttr;
 
   begin
 
@@ -257,17 +450,7 @@ package body vm_manager as
       from  vm_hosts
      where  host_id = p_host_id;
 
-    l_xml_doc := dbms_xmldom.newDOMDocument(l_host_capabilities);
-    l_xml_element := dbms_xmldom.getDocumentElement(l_xml_doc);
-
-    l_node_list := dbms_xmldom.getElementsByTagName(l_xml_element, 'cpus');
-    l_node := dbms_xmldom.item(l_node_list, 0);
-    l_attributes := dbms_xmldom.getattributes(l_node);
-    l_node := dbms_xmldom.getnameditem(l_attributes, 'num');
-    l_attribute := dbms_xmldom.makeattr(l_node);
-    dbms_xmldom.freedocument(l_xml_doc);
-
-    return to_number(dbms_xmldom.getvalue(l_attribute));
+    return get_cpu_count(l_host_capabilities);
 
   end get_cpu_count;
 
@@ -275,13 +458,12 @@ package body vm_manager as
 
   function get_installed_memory
   (
-    p_host_id                         vm_hosts.host_id%type
+    p_host_capabilities               vm_hosts.host_capabilities%type
   )
   return pls_integer
 
   is
 
-    l_sysinfo                         vm_hosts.sysinfo%type;
     l_xml_doc                         dbms_xmldom.DOMDocument;
     l_xml_element                     dbms_xmldom.DOMElement;
     l_node_list                       dbms_xmldom.DOMNodelist;
@@ -291,28 +473,37 @@ package body vm_manager as
 
   begin
 
-    select  sysinfo
-      into  l_sysinfo
-      from  vm_hosts
-     where  host_id = p_host_id;
-
-    l_xml_doc := dbms_xmldom.newDOMDocument(l_sysinfo);
+    l_xml_doc := dbms_xmldom.newDOMDocument(p_host_capabilities);
     l_xml_element := dbms_xmldom.getDocumentElement(l_xml_doc);
 
-    l_node_list := dbms_xmldom.getElementsByTagName(l_xml_element, 'memory_device');
-    for x in 0..dbms_xmldom.getlength(l_node_list) - 1 loop
-
-      l_node := dbms_xmldom.item(l_node_list, x);
-      l_node := dbms_xmldom.getFirstChild(l_node);
-
-      l_child := dbms_xmldom.getfirstchild(l_node);
-      l_installed_memory := l_installed_memory + to_number(substr(dbms_xmldom.getnodevalue(l_child), 1, instr(dbms_xmldom.getnodevalue(l_child), ' ')));
-
-    end loop;
+    l_node_list := dbms_xmldom.getElementsByTagName(l_xml_element, 'memory');
+    l_node := dbms_xmldom.getfirstchild(dbms_xmldom.item(l_node_list, 0));
+    l_installed_memory := to_number(dbms_xmldom.getnodevalue(l_node));
 
     dbms_xmldom.freedocument(l_xml_doc);
 
     return l_installed_memory;
+
+  end get_installed_memory;
+
+  function get_installed_memory
+  (
+    p_host_id                         vm_hosts.host_id%type
+  )
+  return pls_integer
+
+  is
+
+    l_host_capabilities               vm_hosts.host_capabilities%type;
+
+  begin
+
+    select  host_capabilities
+      into  l_host_capabilities
+      from  vm_hosts
+     where  host_id = p_host_id;
+
+    return get_installed_memory(l_host_capabilities);
 
   end get_installed_memory;
 
@@ -371,107 +562,6 @@ package body vm_manager as
       p_columns_to_return => l_columns_to_return);
 
   end get_seed_images;
-
-  procedure start_virtual_machine_action
-  (
-    p_session_id                      varchar2,
-    p_virtual_machine_id              virtual_machines.virtual_machine_id%type,
-    p_virtual_disk_size               number default 0,
-    p_sparse_disk_allocation          varchar2 default 'Y',
-    p_boot_device                     varchar2 default 'hd',
-    p_remove_cdrom_after_first_boot   varchar2 default 'Y',
-    p_first_boot                      varchar2 default 'N'
-  )
-
-  is
-
-    l_json_response                   json_object_t;
-    l_virtual_machine                 virtual_machines%rowtype;
-    l_json_parameters                 json_object_t := json_object_t;
-    l_object_id                       vault_objects.object_id%type;
-    l_object_created                  vault_objects.object_created%type;
-    l_dbos_message                    dbos$message_t;
-    l_host_name                       vm_hosts.host_name%type;
-    l_status                          vm_hosts.status%type;
-
-  begin
-
-    select  *
-      into  l_virtual_machine
-      from  virtual_machines
-     where  virtual_machine_id = p_virtual_machine_id;
-
-    select  host_name, status
-      into  l_host_name, l_status
-      from  vm_hosts
-     where  host_id = l_virtual_machine.host_id;
-
-    if 'online' != l_status then
-
-      raise_application_error(vm_manager.vm_host_offline, vm_manager.vm_host_offline_emsg);
-
-    end if;
-
-    select  object_created
-      into  l_object_created
-      from  vault_objects
-     where  object_id = l_virtual_machine.virtual_disk_id;
-
---    g_plugin_process := dbplugin_api.connect_to_plugin_server(PLUGIN_MODULE);                    -- Connect to the dbplugin_api.
-
-    l_json_parameters.put('machineName', l_virtual_machine.machine_name);
-
-    if l_virtual_machine.virtual_disk_id is not null then
-
-      l_json_response := json_object_t(dgbunker_service.generate_object_filename(p_object_id => l_virtual_machine.virtual_disk_id,
-        p_gateway_name => l_host_name, p_access_mode => dgbunker_service.READ_WRITE_ACCESS,
-        p_linux_file_mode => VDISK_FILE_MODE, p_linux_subdir_mode => SUBDIR_FILE_MODE, p_disable_stream_write => 'Y',
-        p_access_limit => dgbunker_service.unlimited_access_operations, p_valid_until => dgbunker_service.NO_EXPIRATION,
-        p_file_user_group => ROOT_USER, p_subdir_user_group => ROOT_USER, p_session_id => p_session_id));
-
-      l_json_parameters.put('vDiskFilename', l_json_response.get_string('filename'));
-      if 'N' = l_object_created then
-
-        l_json_parameters.put('vDiskSize', p_virtual_disk_size);
-        l_json_parameters.put('sparseDiskAllocation', p_sparse_disk_allocation);
-
-      end if;
-
-    end if;
-
-    if l_virtual_machine.virtual_cdrom_id is not null then
-
-      l_json_response := json_object_t(dgbunker_service.generate_object_filename(p_object_id => l_virtual_machine.virtual_cdrom_id,
-        p_access_limit => dgbunker_service.UNLIMITED_ACCESS_OPERATIONS,
-        p_valid_until => dgbunker_service.NO_EXPIRATION, p_access_mode => dgbunker_service.READ_ACCESS,
-        p_linux_file_mode => VCDROM_FILE_MODE, p_linux_subdir_mode => SUBDIR_FILE_MODE, p_file_user_group => QEMU_USER, p_subdir_user_group => ROOT_USER,
-        p_gateway_name => l_host_name, p_session_id => p_session_id));
-
-      l_json_parameters.put('vCdromFilename', l_json_response.get_string('filename'));
-
-    end if;
-
-    l_json_parameters.put('vCpus', l_virtual_machine.vcpu_count);
-    l_json_parameters.put('vMemory', l_virtual_machine.virtual_memory);
-    l_json_parameters.put('osVariant', l_virtual_machine.os_variant);
-    l_json_parameters.put('networkSource', l_virtual_machine.network_source);
-    l_json_parameters.put('networkDevice', l_virtual_machine.network_device);
-    l_json_parameters.put('persistent', l_virtual_machine.persistent);
-    l_json_parameters.put('bootDevice', p_boot_device);
-
-    l_dbos_message := dbos$message_t(dbms_session.unique_session_id, l_host_name, vm_manager.START_VM_MESSAGE, l_json_parameters.to_string);
-    send_message_to_host_monitor(l_dbos_message);
-
-    if 'Y' = p_remove_cdrom_after_first_boot and
-       'Y' = p_first_boot and l_virtual_machine.virtual_cdrom_id is not null then
-
-      update  virtual_machines
-         set  virtual_cdrom_id = null
-       where  virtual_machine_id = p_virtual_machine_id;
-
-    end if;
-
-  end start_virtual_machine_action;
 
 ---
 ---
@@ -914,7 +1004,7 @@ package body vm_manager as
        l_variant, l_network_source, p_network_device, p_host_id, 'start')
     returning virtual_machine_id into l_virtual_machine_id;
 
-    start_virtual_machine_action(p_session_id => p_session_id, p_virtual_machine_id => l_virtual_machine_id, p_virtual_disk_size => p_virtual_disk_size,
+    create_virtual_machine_action(p_session_id => p_session_id, p_virtual_machine_id => l_virtual_machine_id, p_virtual_disk_size => p_virtual_disk_size,
       p_sparse_disk_allocation => p_sparse_disk_allocation, p_boot_device => 'cdrom', p_remove_cdrom_after_first_boot => 'Y',
       p_first_boot => 'Y');
 
@@ -982,7 +1072,7 @@ package body vm_manager as
        l_variant, l_network_source, p_network_device, p_host_id, 'start')
     returning virtual_machine_id into l_virtual_machine_id;
 
-    start_virtual_machine_action(p_session_id => p_session_id, p_virtual_machine_id => l_virtual_machine_id, p_boot_device => 'hd',
+    create_virtual_machine_action(p_session_id => p_session_id, p_virtual_machine_id => l_virtual_machine_id, p_boot_device => 'hd',
       p_remove_cdrom_after_first_boot => 'Y', p_first_boot => 'Y');
 
   end create_vm_from_qcow_image;
@@ -1056,7 +1146,7 @@ package body vm_manager as
        l_variant, l_network_source, p_network_device, p_host_id, 'start')
     returning virtual_machine_id into l_virtual_machine_id;
 
-    start_virtual_machine_action(p_session_id => p_session_id, p_virtual_machine_id => l_virtual_machine_id, p_boot_device => 'hd',
+    create_virtual_machine_action(p_session_id => p_session_id, p_virtual_machine_id => l_virtual_machine_id, p_boot_device => 'hd',
       p_remove_cdrom_after_first_boot => 'Y', p_first_boot => 'Y');
 
   end create_vm_from_qcow_image;
@@ -1185,7 +1275,7 @@ package body vm_manager as
     select  count(*), json_object('virtualMachines' is json_arrayagg(
                         json_object(
                           'virtualMachineId'  is virtual_machine_id,
-                          'creationTimestamp' is db_twig.convert_date_to_unix_timestamp(creation_timestamp),
+                          'creationTimestamp' is db_twig.convert_timestamp_to_unix_timestamp(creation_timestamp),
                           'machineName'       is machine_name,
                           'status'            is lifecycle_state,
                           'virtualDiskId'     is virtual_disk_id,
@@ -1225,9 +1315,9 @@ package body vm_manager as
               'hostId'            is host_id,
               'hostName'          is host_name,
               'status'            is status,
-              'lastUpdate'        is db_twig.convert_date_to_unix_timestamp(last_update),
-              'installedMemory'   is get_installed_memory(host_id),
-              'cpuCount'          is get_cpu_count(host_id),
+              'lastUpdate'        is db_twig.convert_timestamp_to_unix_timestamp(last_update),
+              'installedMemory'   is get_installed_memory(host_capabilities),
+              'cpuCount'          is get_cpu_count(host_capabilities),
               'hypervisorVersion' is hypervisor_version,
               'libvirtVersion'    is libvirt_version,
               'machineType'       is machine_type,
@@ -1381,7 +1471,7 @@ package body vm_manager as
        set  lifecycle_state = 'start'
      where  virtual_machine_id = p_virtual_machine_id;
 
-    start_virtual_machine_action(p_session_id => p_session_id, p_virtual_machine_id => p_virtual_machine_id, p_boot_device => p_boot_device);
+    create_virtual_machine_action(p_session_id => p_session_id, p_virtual_machine_id => p_virtual_machine_id, p_boot_device => p_boot_device);
 
   end start_virtual_machine;
 

@@ -150,7 +150,19 @@ as
 
   function get_cpu_count
   (
+    p_host_capabilities               vm_hosts.host_capabilities%type
+  )
+  return pls_integer;
+
+  function get_cpu_count
+  (
     p_host_id                         vm_hosts.host_id%type
+  )
+  return pls_integer;
+
+  function get_installed_memory
+  (
+    p_host_capabilities               vm_hosts.host_capabilities%type
   )
   return pls_integer;
 
@@ -201,6 +213,18 @@ as
   (
     p_host_name                       vm_hosts.host_name%type,
     p_json_parameters                 json_object_t
+  );
+
+  procedure send_message_to_host_monitor
+  (
+    p_message                         dbos$message_t
+  );
+
+  procedure set_obscure_vdisk
+  (
+    p_virtual_machine_id              virtual_machines.virtual_machine_id%type,
+    p_disk_number                     pls_integer,
+    p_obscure_filename                varchar2
   );
 
   procedure set_vm_host_offline

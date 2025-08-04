@@ -98,7 +98,8 @@ REM  ...and here
 
 @loadPackages
 
-grant execute on vm_manager_runtime to &runtime_user;
+grant execute on &dbos_user..vm_manager_runtime to &runtime_user;
+create synonym &runtime_user..vm_manager_runtime for &dbos_user..vm_manager_runtime;
 
 set echo on
 
