@@ -17,8 +17,8 @@
 #include "errors.h"
 #include "logger.h"
 
-static virConnectPtr vmConnection = NULL;
-static virErrorPtr vmError = NULL;
+void *vmHostConnection = NULL;
+virErrorPtr vmError = NULL;
 
 static int selfSignalFD = 0;
 static int keepRunning = TRUE;
@@ -200,7 +200,7 @@ int rc = E_SUCCESS, x = 0, state = 0, reason = 0;
 virDomain **domains = NULL, *domain = NULL;
 unsigned int dCount = 0;
 
-  rc = virConnectListAllDomains(vmConnection, &domains, 0);
+  rc = virConnectListAllDomains((virConnect *)vmHostConnection, &domains, 0);
   if (-1 == rc)
   {
     vmHostErrorHandler();
@@ -234,7 +234,7 @@ int rc = E_SUCCESS, x = 0, state = 0, reason = 0, running = FALSE;
 virDomain **domains = NULL, *domain = NULL;
 unsigned int dCount = 0;
 
-  rc = virConnectListAllDomains(vmConnection, &domains, 0);
+  rc = virConnectListAllDomains((virConnect *)vmHostConnection, &domains, 0);
   if (-1 == rc) return vmHostErrorHandler();
 
   dCount = rc;
@@ -277,7 +277,7 @@ cJSON *jsonParms = NULL, *item = NULL, *cjInterfaces = NULL, *cjInterface = NULL
   entryPoint = cJSON_AddStringToObject(jsonParms, "entryPoint", "validateVmState");
   if (!entryPoint) return E_JSON_ERROR;
 
-  rc = virConnectListAllDomains(vmConnection, &domains, 0);
+  rc = virConnectListAllDomains((virConnect *)vmHostConnection, &domains, 0);
   if (-1 == rc) return vmHostErrorHandler();
 
   dCount = rc;
@@ -416,19 +416,19 @@ struct utsname utsnameBuffer;
   bzero(&utsnameBuffer, sizeof(utsnameBuffer));
   rc = uname(&utsnameBuffer);
 
-  vmConnection = virConnectOpen("qemu:///system");
+  vmHostConnection = (void *) virConnectOpen("qemu:///system");
 
-  if (!vmConnection)
+  if (!vmHostConnection)
   {
     vmError = virGetLastError();
     logOutput(LOG_OUTPUT_ERROR, vmError->message);
   }
 
-  vmHostSysinfo = virConnectGetSysinfo(vmConnection, 0);
-  vmHostCapabilities = virConnectGetCapabilities(vmConnection);
+  vmHostSysinfo = virConnectGetSysinfo((virConnect *)vmHostConnection, 0);
+  vmHostCapabilities = virConnectGetCapabilities((virConnect *)vmHostConnection);
 
-  rc = virConnectGetVersion(vmConnection, &hypervisorVersion);
-  rc = virConnectGetLibVersion(vmConnection, &libvirtVersion);
+  rc = virConnectGetVersion((virConnect *)vmHostConnection, &hypervisorVersion);
+  rc = virConnectGetLibVersion((virConnect *)vmHostConnection, &libvirtVersion);
 
   setupSelfSignal();
 
@@ -503,7 +503,7 @@ int monitorDomainEvents(void)
 {
 int rc = E_SUCCESS;
 
-  rc = virConnectDomainEventRegisterAny(vmConnection, NULL, VIR_DOMAIN_EVENT_ID_LIFECYCLE, VIR_DOMAIN_EVENT_CALLBACK(domainEventHandler), NULL, NULL);
+  rc = virConnectDomainEventRegisterAny((virConnect *)vmHostConnection, NULL, VIR_DOMAIN_EVENT_ID_LIFECYCLE, VIR_DOMAIN_EVENT_CALLBACK(domainEventHandler), NULL, NULL);
 
   while (keepRunning) virEventRunDefaultImpl();
 
@@ -513,7 +513,7 @@ int rc = E_SUCCESS;
 void disconnectFromVmHost(void)
 {
   setVmHostOffline();
-  virConnectClose(vmConnection);
+  virConnectClose((virConnect *)vmHostConnection);
 }
 
 int deleteStoragePool(void)
@@ -525,7 +525,7 @@ int deleteStoragePool(void)
   item = cJSON_GetObjectItemCaseSensitive(messagePayload, "storagePool");
   if (!item) return jsonError("storagePool");
 
-  storagePool = virStoragePoolLookupByName(vmConnection, item->valuestring);
+  storagePool = virStoragePoolLookupByName((virConnect *)vmHostConnection, item->valuestring);
 
   rc = virStoragePoolDestroy(storagePool);
   rc = virStoragePoolDelete(storagePool, VIR_STORAGE_POOL_DELETE_NORMAL);

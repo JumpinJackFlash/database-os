@@ -42,6 +42,10 @@ wait_for_another:
       if (messagePayload) cJSON_Delete(messagePayload);
       return rc;
 
+    case MSGT_CREATE_VM:
+      rc = createVirtualMachine();
+      break;
+
     case MSGT_START_VM:
       rc = startVirtualMachine();
       break;

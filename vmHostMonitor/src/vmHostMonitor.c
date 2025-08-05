@@ -428,5 +428,14 @@ exitPoint:
 
   removePidFile();
 
+#ifdef MEMORY_COUNT
+  if (checkMemoryCount())
+  {
+    logOutput(LOG_OUTPUT_ERROR, "Memory leak...");
+    sprintf(text2Log, "Allocated: %ld - Freed: %ld", getMallocCount(), getFreeCount());
+    logOutput(LOG_OUTPUT_ERROR, text2Log);
+  }
+#endif
+
   return rc;
 }

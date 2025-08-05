@@ -18,6 +18,7 @@
 #include "vmHostMonitor.h"
 #include "errors.h"
 #include "logger.h"
+#include "memory.h"
 
 typedef struct
 {
@@ -40,14 +41,17 @@ typedef struct
   char          database[DB_NAME_LENGTH];
 } OCI_CONNECTION;
 
-static OCI_CONNECTION   dbConn;                                                 // Main thread connection.
-static OCI_CONNECTION   qConn;
+static OCI_CONNECTION dbConn;                                                 // Main thread connection.
+static OCI_CONNECTION qConn;
 
 static OCI_SESSION qSess;
 static OCI_SESSION dbSess;
 
 static char jsonParametersStr[16384];
-static char jsonResultStr[8192];
+
+static int jsonResultStrLength = 8192;
+char *jsonResultStr = NULL;
+
 static char queueParms[8192];
 static char queueData[8192];
 
@@ -135,7 +139,6 @@ static sb4 getOraErrorCode(void)
 {
   return oraErrorCode;
 }
-
 
 static int errorHandler(int rc, OCIError *error)
 {
@@ -286,6 +289,8 @@ int connectToDatabase(char *hostName)
 int rc = E_SUCCESS;
 cJSON *jsonParms = NULL, *item = NULL;
 
+  jsonResultStr = allocateMemory(jsonResultStrLength);
+
   logOutput(LOG_OUTPUT_ALWAYS, "Connecting to the database...");
 
   strncpy(dbConn.database, envDatabaseName ? envDatabaseName : configDatabaseName, sizeof(dbConn.database)-1);
@@ -325,7 +330,7 @@ cJSON *jsonParms = NULL, *item = NULL;
   if (rc) return errorHandler(rc, dbSess.oraError);
 
   rc = OCIBindByName(dbConnStmt, &jsonResultBV, dbSess.oraError, (const OraText *)":jsonResult", -1,
-    jsonResultStr, (ub4) sizeof(jsonResultStr)-1, SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0,
+    jsonResultStr, (ub4) jsonResultStrLength - 1, SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0,
     (ub4 *) 0, (sb4) OCI_DEFAULT);
   if (rc) return errorHandler(rc, dbSess.oraError);
 
@@ -373,6 +378,8 @@ void closeStatementHandles(void)
 int disconnectFromDatabase(void)
 {
   logOutput(LOG_OUTPUT_INFO, "Disconnecting from the Oracle database.");
+
+  if (jsonResultStr) freeMemory(jsonResultStr);
 
   dropOracleSession(&qSess);
   dropOracleSession(&dbSess);
@@ -761,3 +768,50 @@ int rc = E_SUCCESS;
 
   return E_SUCCESS;
 }
+
+int getVmXMLDescription(int virtualMachineId, int xmlDescriptionLength)
+{
+cJSON *jsonParms = NULL, *item = NULL;
+int rc = E_SUCCESS, newJsonResultStrLength = xmlDescriptionLength + 256;
+
+  if (jsonResultStrLength < newJsonResultStrLength)
+  {
+    jsonResultStr = (char *) reallocateMemory(jsonResultStr, jsonResultStrLength, newJsonResultStrLength);
+    jsonResultStrLength = newJsonResultStrLength;
+
+    rc = OCIBindByName(dbConnStmt, &jsonResultBV, dbSess.oraError, (const OraText *)":jsonResult", -1,
+      jsonResultStr, (ub4) jsonResultStrLength - 1, SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0,
+      (ub4 *) 0, (sb4) OCI_DEFAULT);
+    if (rc) return errorHandler(rc, dbSess.oraError);
+  }
+
+  jsonParms = cJSON_CreateObject();
+  if (!jsonParms) return E_JSON_ERROR;
+
+  item = cJSON_AddStringToObject(jsonParms, "entryPoint", "getVirtualMachineDescription");
+  if (!item) return E_JSON_ERROR;
+
+  item = cJSON_AddNumberToObject(jsonParms, "virtualMachineId", (double) virtualMachineId);
+  if (!item) return jsonError("virtualMachineId");
+
+  rc = cJSON_PrintPreallocated(jsonParms, jsonParametersStr, sizeof(jsonParametersStr), 0);
+  if (!rc)
+  {
+    rc = E_MALLOC;
+    goto exit_point;
+  }
+  rc = OCIBindByName(dbConnStmt, &jsonParmsBV, dbSess.oraError,
+    (const OraText *)":jsonParameters", -1, jsonParametersStr, (ub4) strlen(jsonParametersStr)+1,
+    SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0, (ub4 *) 0, (sb4) OCI_DEFAULT);
+
+  rc = OCIStmtExecute(dbSess.oraSvcCtx, dbConnStmt, dbSess.oraError, 1, 0, NULL, NULL,
+    OCI_COMMIT_ON_SUCCESS);
+  if (rc && OCI_SUCCESS_WITH_INFO != rc && OCI_NO_DATA != rc) rc = errorHandler(rc, dbSess.oraError);
+
+exit_point:
+
+  if (jsonParms) cJSON_Delete(jsonParms);
+
+  return rc;
+}
+

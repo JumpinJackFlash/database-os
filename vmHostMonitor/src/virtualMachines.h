@@ -8,6 +8,7 @@
 #ifndef VIRTUALMACHINES_H_
 #define VIRTUALMACHINES_H_
 
+int createVirtualMachine(void);
 int startVirtualMachine(void);
 int stopVirtualMachine(void);
 int undefineVirtualMachine(void);

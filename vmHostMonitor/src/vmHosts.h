@@ -8,6 +8,8 @@
 #ifndef VMHOSTS_H_
 #define VMHOSTS_H_
 
+extern void *vmHostConnection;
+
 int connectToVmHost(void);
 void disconnectFromVmHost(void);
 int monitorDomainEvents(void);

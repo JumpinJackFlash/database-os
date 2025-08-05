@@ -132,6 +132,44 @@ int createCloudInitCdrom(void)
 int startVirtualMachine(void)
 {
   char text2Log[LOGMSG_LENGTH];
+  cJSON *item = NULL;
+  virDomain *virtualDomain = NULL;
+  int virtualMachineId = 0, rc = E_SUCCESS, xmlDescriptionLength = 0;
+
+  item = cJSON_GetObjectItemCaseSensitive(messagePayload, "machineName");
+  if (!item) return jsonError("machineName");
+  machineName = item->valuestring;
+
+  item = cJSON_GetObjectItemCaseSensitive(messagePayload, "virtualMachineId");
+  if (!item) return jsonError("virtualMachineId");
+  virtualMachineId = item->valueint;
+
+  item = cJSON_GetObjectItemCaseSensitive(messagePayload, "xmlDescriptionLength");
+  if (!item) return jsonError("xmlDescriptionLength");
+  xmlDescriptionLength = item->valueint;
+
+  rc = getVmXMLDescription(virtualMachineId, xmlDescriptionLength);
+  if (rc) return rc;
+
+  snprintf(text2Log, sizeof(text2Log)-1, "Starting virtual machine: %s", machineName);
+  logOutput(LOG_OUTPUT_VERBOSE, text2Log);
+  logOutput(LOG_OUTPUT_VERBOSE, jsonResultStr);
+
+  virtualDomain = virDomainCreateXML((virConnect *)vmHostConnection, jsonResultStr, 0);
+  if (!virtualDomain)
+  {
+    vmHostErrorHandler();
+    return E_LIBVIRT_ERROR;
+  }
+
+  virDomainFree(virtualDomain);
+
+  return E_SUCCESS;
+}
+
+int createVirtualMachine(void)
+{
+  char text2Log[LOGMSG_LENGTH];
   char vDiskOptions[VDISK_OPTIONS_LENGTH];
   cJSON *item = NULL;
   virDomain *virtualDomain = NULL;

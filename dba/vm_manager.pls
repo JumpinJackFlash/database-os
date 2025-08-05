@@ -107,7 +107,7 @@ package body vm_manager as
     l_json_parameters.put('persistent', l_virtual_machine.persistent);
     l_json_parameters.put('bootDevice', p_boot_device);
 
-    l_dbos_message := dbos$message_t(dbms_session.unique_session_id, l_host_name, vm_manager.START_VM_MESSAGE, l_json_parameters.to_string);
+    l_dbos_message := dbos$message_t(dbms_session.unique_session_id, l_host_name, vm_manager.CREATE_VM_MESSAGE, l_json_parameters.to_string);
     send_message_to_host_monitor(l_dbos_message);
 
     if 'Y' = p_remove_cdrom_after_first_boot and
@@ -262,16 +262,16 @@ package body vm_manager as
 
   end send_message_to_host_monitor;
 
-  procedure set_obscure_vdisk
+  function set_obscure_vdisk
   (
-    p_virtual_machine_id              virtual_machines.virtual_machine_id%type,
+    p_xml_description                 virtual_machines.xml_description%type,
     p_disk_number                     pls_integer,
     p_obscure_filename                varchar2
   )
+  return virtual_machines.xml_description%type
 
   is
 
-    l_xml_description                 virtual_machines.xml_description%type;
     l_json_array                      json_array_t := json_array_t;
     l_xml_doc                         dbms_xmldom.DOMDocument;
     l_xml_element                     dbms_xmldom.DOMElement;
@@ -281,17 +281,12 @@ package body vm_manager as
     l_attributes                      dbms_xmldom.DOMNamedNodeMap;
     l_attribute                       dbms_xmldom.DOMAttr;
     l_node_value                      clob;
-    l_xmltype                         xmltype;
+    l_xml_description                 virtual_machines.xml_description%type;
     l_length                          pls_integer;
 
   begin
 
-    select  xml_description
-      into  l_xml_description
-      from  virtual_machines
-     where  virtual_machine_id = p_virtual_machine_id;
-
-    l_xml_doc := dbms_xmldom.newDOMDocument(l_xml_description);
+    l_xml_doc := dbms_xmldom.newDOMDocument(p_xml_description);
     l_xml_element := dbms_xmldom.getDocumentElement(l_xml_doc);
 
     l_node_list := dbms_xmldom.getElementsByTagName(l_xml_element, 'source');
@@ -311,16 +306,13 @@ package body vm_manager as
       dbms_xmldom.setvalue(l_attribute, p_obscure_filename);
       l_node_value := dbms_xmldom.getvalue(l_attribute);
 
-
     end if;
 
-    l_xmltype := dbms_xmldom.getxmltype(l_xml_doc);
+    l_xml_description := dbms_xmldom.getxmltype(l_xml_doc);
 
     dbms_xmldom.freedocument(l_xml_doc);
 
-    update  virtual_machines
-       set  xml_description = l_xmltype
-     where  virtual_machine_id = p_virtual_machine_id;
+    return l_xml_description;
 
   end set_obscure_vdisk;
 
@@ -1263,6 +1255,28 @@ package body vm_manager as
 
   end get_service_data;
 
+  function get_virtual_machine_description
+  (
+    p_json_parameters                 json_object_t
+  )
+  return clob
+
+  is
+
+    l_virtual_machine_id              virtual_machines.virtual_machine_id%type := db_twig.get_number(p_json_parameters, 'virtualMachineId');
+    l_xml_description                 virtual_machines.xml_description%type;
+
+  begin
+
+    select  xml_description
+      into  l_xml_description
+      from  virtual_machines
+     where  virtual_machine_id = l_virtual_machine_id;
+
+    return l_xml_description.getclobval;
+
+  end get_virtual_machine_description;
+
   function get_virtual_machines return clob
 
   is
@@ -1465,13 +1479,53 @@ package body vm_manager as
 
   is
 
+    l_json_response                   json_object_t;
+    l_virtual_machine                 virtual_machines%rowtype;
+    l_json_parameters                 json_object_t := json_object_t;
+    l_object_id                       vault_objects.object_id%type;
+    l_object_created                  vault_objects.object_created%type;
+    l_dbos_message                    dbos$message_t;
+    l_host_name                       vm_hosts.host_name%type;
+    l_status                          vm_hosts.status%type;
+    l_xml_description                 virtual_machines.xml_description%type;
+
   begin
 
-    update  virtual_machines
-       set  lifecycle_state = 'start'
+    select  *
+      into  l_virtual_machine
+      from  virtual_machines
      where  virtual_machine_id = p_virtual_machine_id;
 
-    create_virtual_machine_action(p_session_id => p_session_id, p_virtual_machine_id => p_virtual_machine_id, p_boot_device => p_boot_device);
+    select  host_name, status
+      into  l_host_name, l_status
+      from  vm_hosts
+     where  host_id = l_virtual_machine.host_id;
+
+    if 'online' != l_status then
+
+      raise_application_error(vm_manager.vm_host_offline, vm_manager.vm_host_offline_emsg);
+
+    end if;
+
+    l_json_response := json_object_t(dgbunker_service.generate_object_filename(p_object_id => l_virtual_machine.virtual_disk_id,
+      p_gateway_name => l_host_name, p_access_mode => dgbunker_service.READ_WRITE_ACCESS,
+      p_linux_file_mode => VDISK_FILE_MODE, p_linux_subdir_mode => SUBDIR_FILE_MODE, p_disable_stream_write => 'Y',
+      p_access_limit => dgbunker_service.unlimited_access_operations, p_valid_until => dgbunker_service.NO_EXPIRATION,
+      p_file_user_group => ROOT_USER, p_subdir_user_group => ROOT_USER, p_session_id => p_session_id));
+
+    l_xml_description := set_obscure_vdisk(l_virtual_machine.xml_description, 0, l_json_response.get_string('filename'));
+
+    update  virtual_machines
+       set  lifecycle_state = 'start',
+            xml_description = l_xml_description
+     where  virtual_machine_id = p_virtual_machine_id;
+
+    l_json_parameters.put('virtualMachineId', p_virtual_machine_id);
+    l_json_parameters.put('machineName', l_virtual_machine.machine_name);
+    l_json_parameters.put('xmlDescriptionLength', dbms_lob.getlength(l_xml_description.getclobval));
+
+    l_dbos_message := dbos$message_t(dbms_session.unique_session_id, l_host_name, vm_manager.START_VM_MESSAGE, l_json_parameters.to_string);
+    send_message_to_host_monitor(l_dbos_message);
 
   end start_virtual_machine;
 

@@ -105,6 +105,10 @@ package body vm_manager_runtime as
 
         l_json_response := get_message_for_host_monitor(p_host_name, l_json_parameters);
 
+      when 'getVirtualMachineDescription' then
+
+        l_json_response := vm_manager.get_virtual_machine_description(l_json_parameters);
+
       when 'registerVmHost' then
 
         vm_manager.register_vm_host(p_host_name, l_json_parameters);

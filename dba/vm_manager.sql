@@ -11,11 +11,12 @@ as
 -- These values are tied to the message types handled by the vmHostMonitor (vmHostMonitorDefs.h)
 
   HOST_MONITOR_REPLY_MESSAGE          constant pls_integer := 10;
-  START_VM_MESSAGE                    constant pls_integer := 20;
+  CREATE_VM_MESSAGE                   constant pls_integer := 20;
   STOP_VM_MESSAGE                     constant pls_integer := 25;
   UNDEFINE_VM_MESSAGE                 constant pls_integer := 30;
   CREATE_CLOUD_INIT_CDROM_MESSAGE     constant pls_integer := 35;
   DELETE_STORAGE_POOL_MESSAGE         constant pls_integer := 40;
+  START_VM_MESSAGE                    constant pls_integer := 45;
 
 -- Error codes and messages. DbTwig has reserved -20000 to -20199. Start with -20200
 
@@ -188,6 +189,12 @@ as
 
   function get_service_data return clob;
 
+  function get_virtual_machine_description
+  (
+    p_json_parameters                 json_object_t
+  )
+  return clob;
+
   function get_virtual_machines return clob;
 
   function get_vm_host_name
@@ -218,13 +225,6 @@ as
   procedure send_message_to_host_monitor
   (
     p_message                         dbos$message_t
-  );
-
-  procedure set_obscure_vdisk
-  (
-    p_virtual_machine_id              virtual_machines.virtual_machine_id%type,
-    p_disk_number                     pls_integer,
-    p_obscure_filename                varchar2
   );
 
   procedure set_vm_host_offline

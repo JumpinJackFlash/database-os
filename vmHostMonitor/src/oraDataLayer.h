@@ -11,6 +11,7 @@
 extern int messageType;
 extern cJSON *messagePayload;
 extern cJSON *responsePayload;
+extern char *jsonResultStr;
 
 int connectToDatabase(char *hostName);
 int disconnectFromDatabase(void);
@@ -25,5 +26,6 @@ int validateVmState(void *vjsonParms);
 int updateVmState(void *vjsonParms);
 int getMsgForVmHostMonitor(void);
 int breakDqSession(void);
+int getVmXMLDescription(int virtualMachineId, int xmlDescriptionLength);
 
 #endif /* ORADATALAYER_H_ */
