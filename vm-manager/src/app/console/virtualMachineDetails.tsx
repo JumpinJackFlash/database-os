@@ -1,7 +1,7 @@
 'use client'
 
 import { formatTimestamp } from "@/utils/clientFunctions";
-import { deleteVirtualMachine, undefineVirtualMachine } from "@/utils/serverFunctions";
+import { deleteVirtualMachine, setPersistentFlag, setSaveXmlDescriptionFlag } from "@/utils/serverFunctions";
 import { Checkbox,  Button } from "@heroui/react";
 import React, { useState, useContext } from "react";
 import { VirtualMachineT, RefreshVirtualMachineListT } from "@/utils/dataTypes";
@@ -27,6 +27,7 @@ export default function VirtualMachines({ virtualMachine, refreshVirtualMachineL
   const [ deleteVmConfirmed, setDeleteVmConfirmed ] = useState(false);
   const [ deleteBootDiskConfirmed, setDeleteBootDiskConfirmed ] = useState(false);
   const [ persistentVM, setPersistentVM ] = useState('Y' === virtualMachine.persistent ? true : false);
+  const [ saveXmlDescription, setSaveXmlDescription ] = useState('Y' === virtualMachine.saveXmlDescription ? true : false);
 
   const vmManagerContext = useContext(VmManagerContext);
 
@@ -50,15 +51,19 @@ export default function VirtualMachines({ virtualMachine, refreshVirtualMachineL
   function setPersistence(setting: boolean)
   {
     setPersistentVM(setting);
-    if (!setting && 'running' === virtualMachine.status)
+    setPersistentFlag(virtualMachine.virtualMachineId, setting ? 'Y' : 'N').then((response) =>
     {
-      undefineVirtualMachine(virtualMachine.virtualMachineId).then((response) =>
-      {
-        if (!response.ok) return vmManagerContext?.showErrorModal(response.jsonData.errorMessage);
-        addToast({ color: 'primary', title: "VM Undefined" });
-      })
-    }
+      if (!response.ok) return vmManagerContext?.showErrorModal(response.jsonData.errorMessage);
+    });
+  }
 
+  function setSaveXmlDescriptionAction(setting: boolean)
+  {
+    setSaveXmlDescription(setting);
+    setSaveXmlDescriptionFlag(virtualMachine.virtualMachineId, setting ? 'Y' : 'N').then((response) =>
+    {
+      if (!response.ok) return vmManagerContext?.showErrorModal(response.jsonData.errorMessage);
+    });
   }
 
   return(
@@ -68,22 +73,24 @@ export default function VirtualMachines({ virtualMachine, refreshVirtualMachineL
         <p>O/S Variant: {virtualMachine.osVariant}</p>
         <p>UUID: {virtualMachine.uuid}</p>
       </div>
-      <div className="columns-3 flex gap-5">
+      <div className="columns-4 flex gap-5">
         <p>Host: {virtualMachine?.host}</p>
         { virtualMachine.creationTimestamp !== undefined &&
           <p>Creation Date: {formatTimestamp(virtualMachine.creationTimestamp, true)}</p>
         }
         <p>Status: {virtualMachine.status}</p>
+        <p>Detail: {virtualMachine.statusDetail}</p>
       </div>
       <div className="columns-3 flex gap-5">
         <p>Network Source: {virtualMachine.networkSource}</p>
         <p>Network Device: {virtualMachine.networkDevice}</p>
         <p>Interfaces: {JSON.stringify(virtualMachine.interfaces)}</p>
       </div>
-      <div>
+      <div className="columns-2 flex gap-5">
         <Checkbox title="Persistent VM's remain defined in the host's VM Manager Interface" isSelected={persistentVM} onValueChange={setPersistence} >Persistent VM</Checkbox>
+        <Checkbox title="Save the VM's description" isSelected={saveXmlDescription} onValueChange={setSaveXmlDescriptionAction} >Save Description?</Checkbox>
       </div>
-      <div className="columns-2 flex gap-1" title={immutableFieldsText}>
+      <div className="columns-2 flex gap-5" title={immutableFieldsText}>
         <Input disabled={inputDisabled} className="w-24" label="VCPU's" labelPlacement="outside" value={vCpus} onValueChange={setVCpus} type="number"  min={1}></Input>
         <Input disabled={inputDisabled} className="w-24" label="VMemory" labelPlacement="outside" value={vMemory} onValueChange={setVMemory} type="number"  min={1}
           endContent=

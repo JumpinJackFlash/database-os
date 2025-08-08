@@ -446,7 +446,7 @@ struct utsname utsnameBuffer;
 static int domainEventHandler(virConnect *conn, virDomain *domain, int event, int detail, void *opaque)
 {
 const char *domainName = NULL;
-char *xmlDesc = NULL;
+char *xmlDescription = NULL;
 
   domainName = virDomainGetName(domain);
   logOutput(LOG_OUTPUT_ALWAYS, (char *) domainName);
@@ -456,34 +456,35 @@ char *xmlDesc = NULL;
   {
     case VIR_DOMAIN_EVENT_RESUMED:
       logOutput(LOG_OUTPUT_ALWAYS, decodeResumedDetail(detail));
-      updateLifecycleState((char *) domainName, "starting", decodeResumedDetail(detail), NULL);
+      updateLifecycleState((char *) domainName, "starting", decodeResumedDetail(detail));
       break;
 
     case VIR_DOMAIN_EVENT_STARTED:
       logOutput(LOG_OUTPUT_ALWAYS, decodeStartupDetail(detail));
-      xmlDesc = virDomainGetXMLDesc(domain, VIR_DOMAIN_XML_INACTIVE);
-      updateLifecycleState((char *) domainName, "running", decodeStartupDetail(detail), xmlDesc);
-      free(xmlDesc);
+      updateLifecycleState((char *) domainName, "running", decodeStartupDetail(detail));
       break;
 
     case VIR_DOMAIN_EVENT_SHUTDOWN:
       logOutput(LOG_OUTPUT_ALWAYS, decodeShutdownDetail(detail));
-      xmlDesc = virDomainGetXMLDesc(domain, VIR_DOMAIN_XML_INACTIVE);
-      updateLifecycleState((char *) domainName, "stopping", decodeShutdownDetail(detail), xmlDesc);
-      free(xmlDesc);
+      if (VIR_DOMAIN_EVENT_SHUTDOWN_GUEST == detail)
+      {
+        xmlDescription = virDomainGetXMLDesc(domain, VIR_DOMAIN_XML_INACTIVE);
+        if (xmlDescription)
+        {
+          updateVmXMLDescription((char *)domainName, xmlDescription);
+          free(xmlDescription);
+        }
+      }
+      updateLifecycleState((char *) domainName, "stopping", decodeShutdownDetail(detail));
       break;
 
     case VIR_DOMAIN_EVENT_STOPPED:
       logOutput(LOG_OUTPUT_ALWAYS, decodeStoppedDetail(detail));
-      updateLifecycleState((char *) domainName, "stopped", decodeStoppedDetail(detail), NULL);
+      updateLifecycleState((char *) domainName, "stopped", decodeStoppedDetail(detail));
       break;
 
     case VIR_DOMAIN_EVENT_UNDEFINED:
-      updatePersistence((char *) domainName, "N");
-      break;
-
     case VIR_DOMAIN_EVENT_DEFINED:
-      updatePersistence((char *) domainName, "Y");
       break;
   }
 
@@ -526,6 +527,8 @@ int deleteStoragePool(void)
   if (!item) return jsonError("storagePool");
 
   storagePool = virStoragePoolLookupByName((virConnect *)vmHostConnection, item->valuestring);
+
+  if (!storagePool) return rc;
 
   rc = virStoragePoolDestroy(storagePool);
   rc = virStoragePoolDelete(storagePool, VIR_STORAGE_POOL_DELETE_NORMAL);

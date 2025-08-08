@@ -4,6 +4,12 @@ package body vm_manager_runtime as
   AQ_TIMEOUT                          EXCEPTION;
   pragma exception_init(AQ_TIMEOUT, -25228);
 
+  PACKAGE_INVALIDATED                 EXCEPTION;
+  pragma exception_init(PACKAGE_INVALIDATED, -4061);
+
+  PACKAGE_DISCARDED                   EXCEPTION;
+  pragma exception_init(PACKAGE_DISCARDED, -4068);
+
   function get_message_for_host_monitor
   (
     p_host_name                       vm_hosts.host_name%type,
@@ -94,8 +100,8 @@ package body vm_manager_runtime as
 
     l_json_parameters                 json_object_t := json_object_t(p_json_parameters);
     l_entry_point                     varchar2(30) := db_twig.get_string(l_json_parameters, 'entryPoint');
-    l_json_response                   clob := '{"status": "success"}';
     l_error_id                        api_errors.error_id%type;
+    l_json_response                   clob := '{"status": "success"}';
 
   begin
 
@@ -125,13 +131,13 @@ package body vm_manager_runtime as
 
         vm_manager.update_lifecycle_state(p_host_name, l_json_parameters);
 
-      when 'updatePersistence' then
+      when 'updateVMDescription' then
 
-        vm_manager.update_persistence(p_host_name, l_json_parameters);
+        vm_manager.update_vm_description(l_json_parameters);
 
       when 'updateVmState' then
 
-        vm_manager.update_vm_state(p_host_name, l_json_parameters);
+        vm_manager.update_vm_state(l_json_parameters);
 
       when 'validateVmState' then
 
@@ -147,7 +153,7 @@ package body vm_manager_runtime as
 
   exception
 
-  when AQ_TIMEOUT then
+  when PACKAGE_INVALIDATED or PACKAGE_DISCARDED or AQ_TIMEOUT then
 
     raise;
 

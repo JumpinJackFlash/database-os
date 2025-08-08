@@ -34,52 +34,52 @@ extern int errno;
 
 int stopVirtualMachine(void)
 {
-  char text2Log[LOGMSG_LENGTH];
+  char text2Log[LOGMSG_LENGTH], *xmlDesc = NULL;
+  int rc = E_SUCCESS;
   cJSON *item = NULL;
+  virDomain *vm = NULL;
 
   item = cJSON_GetObjectItemCaseSensitive(messagePayload, "machineName");
   if (!item) return jsonError("machineName");
+  machineName = item->valuestring;
 
-  snprintf(commandLine, sizeof(commandLine), "%s -c qemu:///system shutdown %s", VIRT_SHELL, item->valuestring);
-  logOutput(LOG_OUTPUT_VERBOSE, commandLine);
+  vm = virDomainLookupByName((virConnect *)vmHostConnection, machineName);
+  if (!vm) return E_SUCCESS;
 
-  process = popen(commandLine, "r");
-  if (!process)
+  xmlDesc = virDomainGetXMLDesc(vm, VIR_DOMAIN_XML_INACTIVE);
+  if (xmlDesc)
   {
-    snprintf(text2Log, sizeof(text2Log), "Unable to shutdown VM: %s", strerror(errno));
-    logOutput(LOG_OUTPUT_ERROR, text2Log);
-    return E_CHILD_DIED;
+    rc = updateVmXMLDescription(machineName, xmlDesc);
+    free(xmlDesc);
   }
 
-  while (fgets(text2Log, sizeof(text2Log), process)) logOutput(LOG_OUTPUT_VERBOSE, text2Log);
+  virDomainDestroy(vm);
+  virDomainFree(vm);
 
-  pclose(process);
+  snprintf(text2Log, sizeof(text2Log)-1, "Stopping virtual machine: %s", machineName);
+  logOutput(LOG_OUTPUT_VERBOSE, text2Log);
 
-  return E_SUCCESS;
+  return rc;
 }
 
 int undefineVirtualMachine(void)
 {
   char text2Log[LOGMSG_LENGTH];
   cJSON *item = NULL;
+  virDomain *vm = NULL;
 
   item = cJSON_GetObjectItemCaseSensitive(messagePayload, "machineName");
   if (!item) return jsonError("machineName");
+  machineName = item->valuestring;
 
-  snprintf(commandLine, sizeof(commandLine), "%s -c qemu:///system undefine %s", VIRT_SHELL, item->valuestring);
-  logOutput(LOG_OUTPUT_VERBOSE, commandLine);
+  vm = virDomainLookupByName((virConnect *)vmHostConnection, machineName);
+  if (!vm) return E_SUCCESS;
 
-  process = popen(commandLine, "r");
-  if (!process)
-  {
-    snprintf(text2Log, sizeof(text2Log), "Unable to undefine VM: %s", strerror(errno));
-    logOutput(LOG_OUTPUT_ERROR, text2Log);
-    return E_CHILD_DIED;
-  }
+  virDomainUndefine(vm);
+  virDomainFree(vm);
 
-  while (fgets(text2Log, sizeof(text2Log), process)) logOutput(LOG_OUTPUT_VERBOSE, text2Log);
-
-  pclose(process);
+  snprintf(text2Log, sizeof(text2Log)-1, "Undefined virtual machine: %s", machineName);
+  logOutput(LOG_OUTPUT_VERBOSE, text2Log);
 
   return E_SUCCESS;
 }
@@ -148,17 +148,30 @@ int startVirtualMachine(void)
   if (!item) return jsonError("xmlDescriptionLength");
   xmlDescriptionLength = item->valueint;
 
+  item = cJSON_GetObjectItemCaseSensitive(messagePayload, "persistent");
+  if (!item) return jsonError("persistent");
+  persistent = item->valuestring;
+
   rc = getVmXMLDescription(virtualMachineId, xmlDescriptionLength);
   if (rc) return rc;
 
   snprintf(text2Log, sizeof(text2Log)-1, "Starting virtual machine: %s", machineName);
   logOutput(LOG_OUTPUT_VERBOSE, text2Log);
-  logOutput(LOG_OUTPUT_VERBOSE, jsonResultStr);
 
-  virtualDomain = virDomainCreateXML((virConnect *)vmHostConnection, jsonResultStr, 0);
+  if ('N' == *persistent)
+  {
+    virtualDomain = virDomainCreateXML((virConnect *)vmHostConnection, jsonResultStr, 0);
+  }
+  else
+  {
+    virtualDomain = virDomainDefineXML((virConnect *)vmHostConnection, jsonResultStr);
+    if (virtualDomain) virDomainCreate(virtualDomain);
+  }
+
   if (!virtualDomain)
   {
     vmHostErrorHandler();
+    updateLifecycleState(machineName, "crashed", "startup failed");
     return E_LIBVIRT_ERROR;
   }
 
@@ -234,14 +247,14 @@ int createVirtualMachine(void)
 
   logOutput(LOG_OUTPUT_VERBOSE, commandLine);
 
-  updateLifecycleState(machineName, "starting", "startup requested", NULL);
+  updateLifecycleState(machineName, "starting", "startup requested");
 
   process = popen(commandLine, "r");
   if (!process)
   {
     snprintf(text2Log, sizeof(text2Log), "Unable to start VM: %s", strerror(errno));
     logOutput(LOG_OUTPUT_ERROR, text2Log);
-    updateLifecycleState(machineName, "crashed", "startup failed", NULL);
+    updateLifecycleState(machineName, "crashed", "startup failed");
     return E_PLUGIN_ERROR;
   }
 
@@ -251,7 +264,7 @@ int createVirtualMachine(void)
 
   if (!virtualMachineIsRunning(machineName))
   {
-    updateLifecycleState(machineName, "crashed", "install failed", NULL);
+    updateLifecycleState(machineName, "crashed", "install failed");
     return E_SUCCESS;
   }
 

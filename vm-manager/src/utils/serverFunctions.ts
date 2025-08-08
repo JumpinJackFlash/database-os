@@ -139,6 +139,20 @@ export async function getVmHosts()
   return response;
 }
 
+export async function setPersistentFlag(virtualMachineId: number, persistent: string)
+{
+  const bodyData = { virtualMachineId, persistent };
+  const response = await callDbTwig('dbos/setPersistent', bodyData);
+  return response;
+}
+
+export async function setSaveXmlDescriptionFlag(virtualMachineId: number, saveXmlDescription: string)
+{
+  const bodyData = { virtualMachineId, saveXmlDescription };
+  const response = await callDbTwig('dbos/setSaveXmlDescription', bodyData);
+  return response;
+}
+
 export async function startVirtualMachine(virtualMachineId: number)
 {
   const bodyData = { virtualMachineId: virtualMachineId };
@@ -157,12 +171,5 @@ export async function terminateUserSession()
 {
   const response = await callDbTwig('icam/terminateUserSession');
   if (response.ok) await deleteSessionCookie();
-  return response;
-}
-
-export async function undefineVirtualMachine(virtualMachineId: number)
-{
-  const bodyData = { virtualMachineId: virtualMachineId };
-  const response = await callDbTwig('dbos/undefineVirtualMachine', bodyData);
   return response;
 }

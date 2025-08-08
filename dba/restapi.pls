@@ -188,6 +188,38 @@ package body restapi as
 
   end get_vm_hosts;
 
+  procedure set_persistent
+  (
+    p_json_parameters                 json_object_t
+  )
+
+  is
+
+    l_virtual_machine_id              virtual_machines.virtual_machine_id%type := db_twig.get_number(p_json_parameters, 'virtualMachineId');
+    l_persistent                      virtual_machines.persistent%type := db_twig.get_string(p_json_parameters, 'persistent');
+
+  begin
+
+    vm_manager.set_persistent(l_virtual_machine_id, l_persistent);
+
+  end set_persistent;
+
+  procedure set_save_xml_description
+  (
+    p_json_parameters                 json_object_t
+  )
+
+  as
+
+    l_virtual_machine_id              virtual_machines.virtual_machine_id%type := db_twig.get_number(p_json_parameters, 'virtualMachineId');
+    l_save_xml_description            virtual_machines.save_xml_description%type := db_twig.get_string(p_json_parameters, 'saveXmlDescription');
+
+  begin
+
+    vm_manager.set_save_xml_description(l_virtual_machine_id, l_save_xml_description);
+
+  end set_save_xml_description;
+
   procedure start_virtual_machine
   (
     p_json_parameters                 json_object_t
@@ -217,21 +249,6 @@ package body restapi as
     vm_manager.stop_virtual_machine(l_virtual_machine_id);
 
   end stop_virtual_machine;
-
-  procedure undefine_virtual_machine
-  (
-    p_json_parameters                 json_object_t
-  )
-
-  as
-
-    l_virtual_machine_id              virtual_machines.virtual_machine_id%type := db_twig.get_number(p_json_parameters, 'virtualMachineId');
-
-  begin
-
-    vm_manager.undefine_virtual_machine(l_virtual_machine_id);
-
-  end undefine_virtual_machine;
 
   procedure validate_session
   (

@@ -227,6 +227,18 @@ as
     p_message                         dbos$message_t
   );
 
+  procedure set_persistent
+  (
+    p_virtual_machine_id              virtual_machines.virtual_machine_id%type,
+    p_persistent                      virtual_machines.persistent%type
+  );
+
+  procedure set_save_xml_description
+  (
+    p_virtual_machine_id              virtual_machines.virtual_machine_id%type,
+    p_save_xml_description            virtual_machines.save_xml_description%type
+  );
+
   procedure set_vm_host_offline
   (
     p_host_name                       vm_hosts.host_name%type
@@ -244,26 +256,19 @@ as
     p_virtual_machine_id              virtual_machines.virtual_machine_id%type
   );
 
-  procedure undefine_virtual_machine
-  (
-    p_virtual_machine_id              virtual_machines.virtual_machine_id%type
-  );
-
   procedure update_lifecycle_state
   (
     p_host_name                       vm_hosts.host_name%type,
     p_json_parameters                 json_object_t
   );
 
-  procedure update_persistence
+  procedure update_vm_description
   (
-    p_host_name                       vm_hosts.host_name%type,
     p_json_parameters                 json_object_t
   );
 
   procedure update_vm_state
   (
-    p_host_name                       vm_hosts.host_name%type,
     p_json_parameters                 json_object_t
   );
 

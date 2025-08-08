@@ -26,9 +26,7 @@ package body vm_manager as
     p_virtual_machine_id              virtual_machines.virtual_machine_id%type,
     p_virtual_disk_size               number default 0,
     p_sparse_disk_allocation          varchar2 default 'Y',
-    p_boot_device                     varchar2 default 'hd',
-    p_remove_cdrom_after_first_boot   varchar2 default 'Y',
-    p_first_boot                      varchar2 default 'N'
+    p_boot_device                     varchar2 default 'hd'
   )
 
   is
@@ -37,7 +35,6 @@ package body vm_manager as
     l_virtual_machine                 virtual_machines%rowtype;
     l_json_parameters                 json_object_t := json_object_t;
     l_object_id                       vault_objects.object_id%type;
-    l_object_created                  vault_objects.object_created%type;
     l_dbos_message                    dbos$message_t;
     l_host_name                       vm_hosts.host_name%type;
     l_status                          vm_hosts.status%type;
@@ -60,13 +57,6 @@ package body vm_manager as
 
     end if;
 
-    select  object_created
-      into  l_object_created
-      from  vault_objects
-     where  object_id = l_virtual_machine.virtual_disk_id;
-
---    g_plugin_process := dbplugin_api.connect_to_plugin_server(PLUGIN_MODULE);                    -- Connect to the dbplugin_api.
-
     l_json_parameters.put('machineName', l_virtual_machine.machine_name);
 
     if l_virtual_machine.virtual_disk_id is not null then
@@ -78,7 +68,7 @@ package body vm_manager as
         p_file_user_group => ROOT_USER, p_subdir_user_group => ROOT_USER, p_session_id => p_session_id));
 
       l_json_parameters.put('vDiskFilename', l_json_response.get_string('filename'));
-      if 'N' = l_object_created then
+      if 0 != p_virtual_disk_size then
 
         l_json_parameters.put('vDiskSize', p_virtual_disk_size);
         l_json_parameters.put('sparseDiskAllocation', p_sparse_disk_allocation);
@@ -110,14 +100,9 @@ package body vm_manager as
     l_dbos_message := dbos$message_t(dbms_session.unique_session_id, l_host_name, vm_manager.CREATE_VM_MESSAGE, l_json_parameters.to_string);
     send_message_to_host_monitor(l_dbos_message);
 
-    if 'Y' = p_remove_cdrom_after_first_boot and
-       'Y' = p_first_boot and l_virtual_machine.virtual_cdrom_id is not null then
-
-      update  virtual_machines
-         set  virtual_cdrom_id = null
-       where  virtual_machine_id = p_virtual_machine_id;
-
-    end if;
+    update  virtual_machines
+       set  virtual_cdrom_id = null
+     where  virtual_machine_id = p_virtual_machine_id;
 
   end create_virtual_machine_action;
 
@@ -990,15 +975,14 @@ package body vm_manager as
 
     insert into virtual_machines
       (virtual_machine_id, machine_name, virtual_disk_id, virtual_cdrom_id, vcpu_count, virtual_memory, os_variant,
-       network_source, network_device, host_id, lifecycle_state)
+       network_source, network_device, host_id, lifecycle_state, save_xml_description)
     values
       (id_seq.nextval, p_machine_name, l_object_id, p_iso_image_id, p_vcpu_count, p_virtual_memory * 1024,
-       l_variant, l_network_source, p_network_device, p_host_id, 'start')
+       l_variant, l_network_source, p_network_device, p_host_id, 'start', 'N')
     returning virtual_machine_id into l_virtual_machine_id;
 
     create_virtual_machine_action(p_session_id => p_session_id, p_virtual_machine_id => l_virtual_machine_id, p_virtual_disk_size => p_virtual_disk_size,
-      p_sparse_disk_allocation => p_sparse_disk_allocation, p_boot_device => 'cdrom', p_remove_cdrom_after_first_boot => 'Y',
-      p_first_boot => 'Y');
+      p_sparse_disk_allocation => p_sparse_disk_allocation, p_boot_device => 'cdrom');
 
   end create_vm_from_iso_image;
 
@@ -1064,8 +1048,7 @@ package body vm_manager as
        l_variant, l_network_source, p_network_device, p_host_id, 'start')
     returning virtual_machine_id into l_virtual_machine_id;
 
-    create_virtual_machine_action(p_session_id => p_session_id, p_virtual_machine_id => l_virtual_machine_id, p_boot_device => 'hd',
-      p_remove_cdrom_after_first_boot => 'Y', p_first_boot => 'Y');
+    create_virtual_machine_action(p_session_id => p_session_id, p_virtual_machine_id => l_virtual_machine_id, p_boot_device => 'hd');
 
   end create_vm_from_qcow_image;
 
@@ -1138,8 +1121,7 @@ package body vm_manager as
        l_variant, l_network_source, p_network_device, p_host_id, 'start')
     returning virtual_machine_id into l_virtual_machine_id;
 
-    create_virtual_machine_action(p_session_id => p_session_id, p_virtual_machine_id => l_virtual_machine_id, p_boot_device => 'hd',
-      p_remove_cdrom_after_first_boot => 'Y', p_first_boot => 'Y');
+    create_virtual_machine_action(p_session_id => p_session_id, p_virtual_machine_id => l_virtual_machine_id, p_boot_device => 'hd');
 
   end create_vm_from_qcow_image;
 
@@ -1289,20 +1271,22 @@ package body vm_manager as
     select  count(*), json_object('virtualMachines' is json_arrayagg(
                         json_object(
                           'virtualMachineId'  is virtual_machine_id,
-                          'creationTimestamp' is db_twig.convert_timestamp_to_unix_timestamp(creation_timestamp),
-                          'machineName'       is machine_name,
-                          'status'            is lifecycle_state,
-                          'virtualDiskId'     is virtual_disk_id,
-                          'virtualCdromId'    is virtual_cdrom_id,
-                          'vCpuCount'         is vcpu_count,
-                          'virtualMemory'     is virtual_memory,
-                          'osVariant'         is os_variant,
-                          'networkSource'     is network_source,
-                          'networkDevice'     is network_device,
-                          'uuid'              is uuid,
-                          'interfaces'        is interfaces,
-                          'persistent'        is persistent,
-                          'host'              is vm_manager.get_vm_host_name(host_id)) order by machine_name returning clob) returning clob)
+                          'creationTimestamp'   is db_twig.convert_timestamp_to_unix_timestamp(creation_timestamp),
+                          'machineName'         is machine_name,
+                          'status'              is lifecycle_state,
+                          'statusDetail'        is state_detail,
+                          'virtualDiskId'       is virtual_disk_id,
+                          'virtualCdromId'      is virtual_cdrom_id,
+                          'vCpuCount'           is vcpu_count,
+                          'virtualMemory'       is virtual_memory,
+                          'osVariant'           is os_variant,
+                          'networkSource'       is network_source,
+                          'networkDevice'       is network_device,
+                          'uuid'                is uuid,
+                          'interfaces'          is interfaces,
+                          'persistent'          is persistent,
+                          'saveXmlDescription'  is save_xml_description,
+                          'host'                is vm_manager.get_vm_host_name(host_id)) order by machine_name returning clob) returning clob)
       into  l_rows, l_result
       from  virtual_machines;
 
@@ -1454,6 +1438,58 @@ package body vm_manager as
 
   end register_vm_host;
 
+  procedure set_persistent
+  (
+    p_virtual_machine_id              virtual_machines.virtual_machine_id%type,
+    p_persistent                      virtual_machines.persistent%type
+  )
+
+  is
+
+    l_dbos_message                    dbos$message_t;
+    l_host_name                       vm_hosts.host_name%type;
+    l_machine_name                    virtual_machines.machine_name%type;
+    l_lifecycle_state                 virtual_machines.lifecycle_state%type;
+    l_json_parameters                 json_object_t := json_object_t;
+
+  begin
+
+    select  machine_name, host_name, lifecycle_state
+      into  l_machine_name, l_host_name, l_lifecycle_state
+      from  vm_hosts h, virtual_machines m
+     where  virtual_machine_id = p_virtual_machine_id
+       and  h.host_id = m.host_id;
+
+    update  virtual_machines
+       set  persistent = p_persistent
+     where  virtual_machine_id = p_virtual_machine_id;
+
+    if 'running' = l_lifecycle_state and 'N' = p_persistent then
+
+      l_json_parameters.put('machineName', l_machine_name);
+      l_dbos_message := dbos$message_t(dbms_session.unique_session_id, l_host_name, vm_manager.UNDEFINE_VM_MESSAGE, l_json_parameters.to_string);
+      send_message_to_host_monitor(l_dbos_message);
+
+    end if;
+
+  end set_persistent;
+
+  procedure set_save_xml_description
+  (
+    p_virtual_machine_id              virtual_machines.virtual_machine_id%type,
+    p_save_xml_description            virtual_machines.save_xml_description%type
+  )
+
+  is
+
+  begin
+
+    update  virtual_machines
+       set  save_xml_description = p_save_xml_description
+     where  virtual_machine_id = p_virtual_machine_id;
+
+  end set_save_xml_description;
+
   procedure set_vm_host_offline
   (
     p_host_name                       vm_hosts.host_name%type
@@ -1483,7 +1519,6 @@ package body vm_manager as
     l_virtual_machine                 virtual_machines%rowtype;
     l_json_parameters                 json_object_t := json_object_t;
     l_object_id                       vault_objects.object_id%type;
-    l_object_created                  vault_objects.object_created%type;
     l_dbos_message                    dbos$message_t;
     l_host_name                       vm_hosts.host_name%type;
     l_status                          vm_hosts.status%type;
@@ -1507,6 +1542,17 @@ package body vm_manager as
 
     end if;
 
+    if l_virtual_machine.xml_description is null then
+
+      update  virtual_machines
+         set  lifecycle_state = 'start'
+       where  virtual_machine_id = p_virtual_machine_id;
+
+      create_virtual_machine_action(p_session_id, p_virtual_machine_id);
+      return;
+
+    end if;
+
     l_json_response := json_object_t(dgbunker_service.generate_object_filename(p_object_id => l_virtual_machine.virtual_disk_id,
       p_gateway_name => l_host_name, p_access_mode => dgbunker_service.READ_WRITE_ACCESS,
       p_linux_file_mode => VDISK_FILE_MODE, p_linux_subdir_mode => SUBDIR_FILE_MODE, p_disable_stream_write => 'Y',
@@ -1523,6 +1569,7 @@ package body vm_manager as
     l_json_parameters.put('virtualMachineId', p_virtual_machine_id);
     l_json_parameters.put('machineName', l_virtual_machine.machine_name);
     l_json_parameters.put('xmlDescriptionLength', dbms_lob.getlength(l_xml_description.getclobval));
+    l_json_parameters.put('persistent', l_virtual_machine.persistent);
 
     l_dbos_message := dbos$message_t(dbms_session.unique_session_id, l_host_name, vm_manager.START_VM_MESSAGE, l_json_parameters.to_string);
     send_message_to_host_monitor(l_dbos_message);
@@ -1565,49 +1612,12 @@ package body vm_manager as
     end if;
 
     l_json_parameters.put('machineName', l_virtual_machine.machine_name);
+    l_json_parameters.put('virtualMachineId', p_virtual_machine_id);
 
     l_dbos_message := dbos$message_t(dbms_session.unique_session_id, l_host_name, vm_manager.STOP_VM_MESSAGE, l_json_parameters.to_string);
     send_message_to_host_monitor(l_dbos_message);
 
   end stop_virtual_machine;
-
-  procedure undefine_virtual_machine
-  (
-    p_virtual_machine_id              virtual_machines.virtual_machine_id%type
-  )
-
-  is
-
-    l_virtual_machine                 virtual_machines%rowtype;
-    l_json_parameters                 json_object_t := json_object_t;
-    l_host_name                       vm_hosts.host_name%type;
-    l_status                          vm_hosts.status%type;
-    l_dbos_message                    dbos$message_t;
-
-  begin
-
-    select  *
-      into  l_virtual_machine
-      from  virtual_machines
-     where  virtual_machine_id = p_virtual_machine_id;
-
-    select  host_name, status
-      into  l_host_name, l_status
-      from  vm_hosts
-     where  host_id = l_virtual_machine.host_id;
-
-    if 'online' != l_status then
-
-      raise_application_error(vm_manager.vm_host_offline, vm_manager.vm_host_offline_emsg);
-
-    end if;
-
-    l_json_parameters.put('machineName', l_virtual_machine.machine_name);
-
-    l_dbos_message := dbos$message_t(dbms_session.unique_session_id, l_host_name, vm_manager.UNDEFINE_VM_MESSAGE, l_json_parameters.to_string);
-    send_message_to_host_monitor(l_dbos_message);
-
-  end undefine_virtual_machine;
 
   procedure update_lifecycle_state
   (
@@ -1617,11 +1627,9 @@ package body vm_manager as
 
   is
 
-    l_message_payload                 json_object_t := db_twig.get_object(p_json_parameters, 'messagePayload');
-    l_machine_name                    virtual_machines.machine_name%type := db_twig.get_string(l_message_payload, 'machineName');
-    l_lifecycle_state                 virtual_machines.lifecycle_state%type := db_twig.get_string(l_message_payload, 'lifecycleState');
-    l_state_detail                    virtual_machines.state_detail%type := db_twig.get_string(l_message_payload, 'detail');
-    l_xml_description                 clob;
+    l_machine_name                    virtual_machines.machine_name%type := db_twig.get_string(p_json_parameters, 'machineName');
+    l_lifecycle_state                 virtual_machines.lifecycle_state%type := db_twig.get_string(p_json_parameters, 'lifecycleState');
+    l_state_detail                    virtual_machines.state_detail%type := db_twig.get_string(p_json_parameters, 'detail');
     l_disks                           json_array_t;
     l_dbos_message                    dbos$message_t;
 
@@ -1637,17 +1645,9 @@ package body vm_manager as
 
     validate_lifecycle_state(l_virtual_machine.lifecycle_state, l_virtual_machine.state_detail, l_lifecycle_state, l_state_detail);
 
-    if l_lifecycle_state in ('running', 'stopping') then
-
-      l_xml_description := db_twig.get_clob(l_message_payload, 'xmlDescription');
-      l_virtual_machine.xml_description := xmltype(l_xml_description);
-
-    end if;
-
     update  virtual_machines
        set  lifecycle_state = l_lifecycle_state,
-            state_detail = l_state_detail,
-            xml_description = l_virtual_machine.xml_description
+            state_detail = l_state_detail
      where  machine_name = l_machine_name;
 
     if 'stopped' = l_lifecycle_state then
@@ -1669,29 +1669,27 @@ package body vm_manager as
 
   end update_lifecycle_state;
 
-  procedure update_persistence
+  procedure update_vm_description
   (
-    p_host_name                       vm_hosts.host_name%type,
     p_json_parameters                 json_object_t
   )
 
   is
 
-    l_message_payload                 json_object_t := db_twig.get_object(p_json_parameters, 'messagePayload');
-    l_machine_name                    virtual_machines.machine_name%type := db_twig.get_string(l_message_payload, 'machineName');
-    l_persistent                      virtual_machines.persistent%type := db_twig.get_string(l_message_payload, 'persistent');
+    l_machine_name                    virtual_machines.machine_name%type := db_twig.get_string(p_json_parameters, 'machineName');
+    l_xml_description                 clob := db_twig.get_clob(p_json_parameters, 'xmlDescription');
 
   begin
 
     update  virtual_machines
-       set  persistent = l_persistent
-     where  machine_name = l_machine_name;
+       set  xml_description = xmltype(l_xml_description)
+     where  machine_name = l_machine_name
+       and  save_xml_description = 'Y';
 
-  end update_persistence;
+  end update_vm_description;
 
   procedure update_vm_state
   (
-    p_host_name                       vm_hosts.host_name%type,
     p_json_parameters                 json_object_t
   )
 

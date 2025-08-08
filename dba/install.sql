@@ -149,14 +149,16 @@ create table virtual_machines
     constraint state_detail_chk check (state_detail in ('unknown', 'shutdown finished', 'guest initiated', 'host initiated', 
       'normal shutdown', 'host poweroff', 'guest crashed', 'migrated', 'saved', 'host failed', 'snapshot loaded', 'normal startup', 
       'incoming migration', 'restored state', 'restored snapshot', 'wakeup event', 'normal resume', 'migration complete', 
-      'snapshot complete', 'migration running', 'migration failed', 'startup requested', 'install failed')),
+      'snapshot complete', 'migration running', 'migration failed', 'startup requested', 'install failed', 'startup failed')),
   network_source                    varchar2(30),
   network_device                    varchar2(30),
   interfaces                        clob
     constraint interfaces_chk check(interfaces is json),
   host_id                           number(7)
     references vm_hosts(host_id),
-  xml_description                   xmltype
+  xml_description                   xmltype,
+  save_xml_description              varchar2(1) default 'Y' not null
+    constraint save_xml_chk check (save_xml_description in ('Y', 'N'))
 );
 
 create table os_variants

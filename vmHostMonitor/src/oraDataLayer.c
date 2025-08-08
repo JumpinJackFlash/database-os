@@ -441,16 +441,13 @@ exit_point:
   return rc;
 }
 
-int updateLifecycleState(char *machineName, char *lifecycleState, char *detail, char *xmlDescription)
+int updateLifecycleState(char *machineName, char *lifecycleState, char *detail)
 {
-cJSON *jsonParms = NULL, *jsonObject = NULL, *item = NULL;
+cJSON *jsonParms = NULL, *item = NULL;
 int rc = E_SUCCESS;
 
   jsonParms = cJSON_CreateObject();
   if (!jsonParms) return E_JSON_ERROR;
-
-  jsonObject = cJSON_CreateObject();
-  if (!jsonObject) return E_JSON_ERROR;
 
   item = cJSON_AddStringToObject(jsonParms, "entryPoint", "updateLifecycleState");
   if (!item) return jsonError("entryPoint");
@@ -458,23 +455,14 @@ int rc = E_SUCCESS;
   item = cJSON_AddStringToObject(jsonParms, "clientHandle", clientHandle);
   if (!item) return jsonError("clientHandle");
 
-  item = cJSON_AddStringToObject(jsonObject, "machineName", machineName);
+  item = cJSON_AddStringToObject(jsonParms, "machineName", machineName);
   if (!item) return jsonError("machineName");
 
-  item = cJSON_AddStringToObject(jsonObject, "lifecycleState", lifecycleState);
+  item = cJSON_AddStringToObject(jsonParms, "lifecycleState", lifecycleState);
   if (!item) return jsonError("lifecycleState");
 
-  item = cJSON_AddStringToObject(jsonObject, "detail", detail);
+  item = cJSON_AddStringToObject(jsonParms, "detail", detail);
   if (!item) return jsonError("detail");
-
-  if (xmlDescription)
-  {
-    item = cJSON_AddStringToObject(jsonObject, "xmlDescription", xmlDescription);
-    if (!item) return jsonError("detail");
-  }
-
-  rc = cJSON_AddItemToObject(jsonParms, "messagePayload", jsonObject);
-  if (!rc) return jsonError("messagePayload");
 
   rc = cJSON_PrintPreallocated(jsonParms, jsonParametersStr, sizeof(jsonParametersStr), 0);
   if (!rc)
@@ -484,59 +472,6 @@ int rc = E_SUCCESS;
   }
 
   logOutput(LOG_OUTPUT_VERBOSE, jsonParametersStr);
-
-  pthread_mutex_lock(&dbConnMtx);
-
-  rc = OCIBindByName(dbConnStmt, &jsonParmsBV, dbSess.oraError,
-    (const OraText *)":jsonParameters", -1, jsonParametersStr, (ub4) strlen(jsonParametersStr)+1,
-    SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0, (ub4 *) 0, (sb4) OCI_DEFAULT);
-
-  rc = OCIStmtExecute(dbSess.oraSvcCtx, dbConnStmt, dbSess.oraError, 1, 0, NULL, NULL,
-    OCI_COMMIT_ON_SUCCESS);
-
-  pthread_mutex_unlock(&dbConnMtx);
-
-  if (rc && OCI_SUCCESS_WITH_INFO != rc && OCI_NO_DATA != rc) rc = errorHandler(rc, dbSess.oraError);
-
-exit_point:
-
-  if (jsonParms) cJSON_Delete(jsonParms);
-
-  return rc;
-}
-
-int updatePersistence(char *machineName, char *persistent)
-{
-cJSON *jsonParms = NULL, *jsonObject = NULL, *item = NULL;
-int rc = E_SUCCESS;
-
-  jsonParms = cJSON_CreateObject();
-  if (!jsonParms) return E_JSON_ERROR;
-
-  jsonObject = cJSON_CreateObject();
-  if (!jsonObject) return E_JSON_ERROR;
-
-  item = cJSON_AddStringToObject(jsonParms, "entryPoint", "updatePersistence");
-  if (!item) return jsonError("entryPoint");
-
-  item = cJSON_AddStringToObject(jsonParms, "clientHandle", clientHandle);
-  if (!item) return jsonError("clientHandle");
-
-  item = cJSON_AddStringToObject(jsonObject, "machineName", machineName);
-  if (!item) return jsonError("machineName");
-
-  item = cJSON_AddStringToObject(jsonObject, "persistent", persistent);
-  if (!item) return jsonError("lifecycleState");
-
-  rc = cJSON_AddItemToObject(jsonParms, "messagePayload", jsonObject);
-  if (!rc) return jsonError("messagePayload");
-
-  rc = cJSON_PrintPreallocated(jsonParms, jsonParametersStr, sizeof(jsonParametersStr), 0);
-  if (!rc)
-  {
-    rc = E_MALLOC;
-    goto exit_point;
-  }
 
   pthread_mutex_lock(&dbConnMtx);
 
@@ -769,6 +704,49 @@ int rc = E_SUCCESS;
   return E_SUCCESS;
 }
 
+int updateVmXMLDescription(char *machineName, char *xmlDescription)
+{
+  cJSON *jsonParms = NULL, *item = NULL;
+  int rc = E_SUCCESS;
+
+  jsonParms = cJSON_CreateObject();
+  if (!jsonParms) return E_JSON_ERROR;
+
+  item = cJSON_AddStringToObject(jsonParms, "entryPoint", "updateVMDescription");
+  if (!item) return E_JSON_ERROR;
+
+  item = cJSON_AddStringToObject(jsonParms, "machineName", machineName);
+  if (!item) return jsonError("machineName");
+
+  item = cJSON_AddStringToObject(jsonParms, "xmlDescription", xmlDescription);
+  if (!item) return jsonError("detail");
+
+  rc = cJSON_PrintPreallocated(jsonParms, jsonParametersStr, sizeof(jsonParametersStr), 0);
+  if (!rc)
+  {
+    rc = E_MALLOC;
+    goto exit_point;
+  }
+
+  pthread_mutex_lock(&dbConnMtx);
+
+  rc = OCIBindByName(dbConnStmt, &jsonParmsBV, dbSess.oraError,
+    (const OraText *)":jsonParameters", -1, jsonParametersStr, (ub4) strlen(jsonParametersStr)+1,
+    SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0, (ub4 *) 0, (sb4) OCI_DEFAULT);
+
+  rc = OCIStmtExecute(dbSess.oraSvcCtx, dbConnStmt, dbSess.oraError, 1, 0, NULL, NULL,
+    OCI_COMMIT_ON_SUCCESS);
+  if (rc && OCI_SUCCESS_WITH_INFO != rc && OCI_NO_DATA != rc) rc = errorHandler(rc, dbSess.oraError);
+
+  pthread_mutex_unlock(&dbConnMtx);
+
+exit_point:
+
+  if (jsonParms) cJSON_Delete(jsonParms);
+
+  return rc;
+}
+
 int getVmXMLDescription(int virtualMachineId, int xmlDescriptionLength)
 {
 cJSON *jsonParms = NULL, *item = NULL;
@@ -800,6 +778,9 @@ int rc = E_SUCCESS, newJsonResultStrLength = xmlDescriptionLength + 256;
     rc = E_MALLOC;
     goto exit_point;
   }
+
+  pthread_mutex_lock(&dbConnMtx);
+
   rc = OCIBindByName(dbConnStmt, &jsonParmsBV, dbSess.oraError,
     (const OraText *)":jsonParameters", -1, jsonParametersStr, (ub4) strlen(jsonParametersStr)+1,
     SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0, (ub4 *) 0, (sb4) OCI_DEFAULT);
@@ -807,6 +788,8 @@ int rc = E_SUCCESS, newJsonResultStrLength = xmlDescriptionLength + 256;
   rc = OCIStmtExecute(dbSess.oraSvcCtx, dbConnStmt, dbSess.oraError, 1, 0, NULL, NULL,
     OCI_COMMIT_ON_SUCCESS);
   if (rc && OCI_SUCCESS_WITH_INFO != rc && OCI_NO_DATA != rc) rc = errorHandler(rc, dbSess.oraError);
+
+  pthread_mutex_unlock(&dbConnMtx);
 
 exit_point:
 

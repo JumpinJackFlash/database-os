@@ -44,6 +44,7 @@ export type VirtualMachineT =
   creationTimestamp: number,
   machineName: string,
   status: string,
+  statusDetail: string,
   virtualDiskId: string,
   virtualCdromId: string,
   vCpuCount: number,
@@ -54,7 +55,8 @@ export type VirtualMachineT =
   host: string,
   interfaces: string,
   persistent: string,
-  uuid: string
+  uuid: string,
+  saveXmlDescription: string
 };
 
 export type VirtualMachinesT =
