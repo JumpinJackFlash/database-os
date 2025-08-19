@@ -1,3 +1,9 @@
+export type AttachedStorageT = 
+{
+  diskSize: number,
+  diskLabel: string
+}
+
 export type NameserverT =
 {
   id: number,
@@ -55,8 +61,7 @@ export type VirtualMachineT =
   host: string,
   interfaces: string,
   persistent: string,
-  uuid: string,
-  saveXmlDescription: string
+  uuid: string
 };
 
 export type VirtualMachinesT =

@@ -1,7 +1,7 @@
 'use client'
 
 import VirtualMachines from './virtualMachines';
-import CreateVM from "./createVM";
+import CreateVM from "./createVM/createVM";
 
 import { getVirtualMachines, terminateUserSession } from "@/utils/serverFunctions";
 import { Button, Divider } from "@heroui/react";

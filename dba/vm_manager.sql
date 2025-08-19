@@ -71,7 +71,7 @@ as
   (
     p_session_id                      varchar2,
     p_seed_image_name                 varchar2,
-    p_virtual_disk_id                 virtual_machines.virtual_disk_id%type
+    p_boot_disk_id                    virtual_machines.boot_disk_id%type
   );
 
   function create_virtual_disk_from_seed
@@ -82,7 +82,7 @@ as
   )
   return vault_objects.object_id%type;
 
-  function create_boot_disk
+  function create_virtual_disk
   (
     p_session_id                      varchar2,
     p_disk_image_name                 varchar2
@@ -93,7 +93,7 @@ as
   (
     p_session_id                      varchar2,
     p_machine_name                    virtual_machines.machine_name%type,
-    p_iso_image_id                    virtual_machines.virtual_disk_id%type,
+    p_iso_image_id                    vault_objects.object_id%type,
     p_os_variant_id                   os_variants.variant_id%type,
     p_host_id                         vm_hosts.host_id%type,
     p_virtual_disk_size               number default 0,
@@ -101,14 +101,15 @@ as
     p_vcpu_count                      virtual_machines.vcpu_count%type default 1,
     p_virtual_memory                  virtual_machines.virtual_memory%type default 1024,
     p_bridged_connection              varchar2 default 'N',
-    p_network_device                  virtual_machines.network_device%type default 'default'
+    p_network_device                  virtual_machines.network_device%type default 'default',
+    p_attached_storage                json_array_t default null
   );
 
   procedure create_vm_from_qcow_image
   (
     p_session_id                      varchar2,
     p_machine_name                    virtual_machines.machine_name%type,
-    p_seed_image_id                   virtual_machines.virtual_disk_id%type,
+    p_seed_image_id                   virtual_machines.boot_disk_id%type,
     p_os_variant_id                   os_variants.variant_id%type,
     p_host_id                         vm_hosts.host_id%type,
     p_meta_data                       clob,
@@ -117,14 +118,15 @@ as
     p_vcpu_count                      virtual_machines.vcpu_count%type default 1,
     p_virtual_memory                  virtual_machines.virtual_memory%type default 1024,
     p_bridged_connection              varchar2 default 'N',
-    p_network_device                  virtual_machines.network_device%type default 'default'
+    p_network_device                  virtual_machines.network_device%type default 'default',
+    p_attached_storage                json_array_t default null
   );
 
   procedure create_vm_from_qcow_image
   (
     p_session_id                      varchar2,
     p_machine_name                    virtual_machines.machine_name%type,
-    p_seed_image_id                   virtual_machines.virtual_disk_id%type,
+    p_seed_image_id                   virtual_machines.boot_disk_id%type,
     p_os_variant_id                   os_variants.variant_id%type,
     p_host_id                         vm_hosts.host_id%type,
     p_user                            varchar2,
@@ -139,7 +141,8 @@ as
     p_vcpu_count                      virtual_machines.vcpu_count%type default 1,
     p_virtual_memory                  virtual_machines.virtual_memory%type default 1024,
     p_bridged_connection              varchar2 default 'N',
-    p_network_device                  virtual_machines.network_device%type default 'default'
+    p_network_device                  virtual_machines.network_device%type default 'default',
+    p_attached_storage                json_array_t default null
   );
 
   procedure delete_virtual_machine
@@ -233,12 +236,6 @@ as
     p_persistent                      virtual_machines.persistent%type
   );
 
-  procedure set_save_xml_description
-  (
-    p_virtual_machine_id              virtual_machines.virtual_machine_id%type,
-    p_save_xml_description            virtual_machines.save_xml_description%type
-  );
-
   procedure set_vm_host_offline
   (
     p_host_name                       vm_hosts.host_name%type
@@ -247,8 +244,7 @@ as
   procedure start_virtual_machine
   (
     p_session_id                      varchar2,
-    p_virtual_machine_id              virtual_machines.virtual_machine_id%type,
-    p_boot_device                     varchar2 default 'hd'
+    p_virtual_machine_id              virtual_machines.virtual_machine_id%type
   );
 
   procedure stop_virtual_machine
@@ -263,6 +259,11 @@ as
   );
 
   procedure update_vm_description
+  (
+    p_json_parameters                 json_object_t
+  );
+
+  procedure update_vm_info
   (
     p_json_parameters                 json_object_t
   );

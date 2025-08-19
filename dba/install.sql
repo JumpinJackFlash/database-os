@@ -132,9 +132,7 @@ create table virtual_machines
   virtual_machine_id                number(12) primary key,
   creation_timestamp                timestamp default systimestamp at time zone 'utc' not null,
   machine_name                      varchar2(30) unique not null,
-  virtual_disk_id                   varchar2(32) unique
-    references vault_objects(object_id),
-  virtual_cdrom_id                  varchar2(32)
+  boot_disk_id                      varchar2(32) unique
     references vault_objects(object_id),
   vcpu_count                        number(4),
   virtual_memory                    number(6),
@@ -144,7 +142,7 @@ create table virtual_machines
     constraint persistent_chk check (persistent in ('Y', 'N')),
   lifecycle_state                   varchar2(11) default 'stopped' not null
     constraint lifecycle_state_chk check (lifecycle_state in ('unknown', 'start', 'starting', 'running', 'blocked', 'pausing', 
-      'paused', 'stop', 'stopping', 'stopped', 'crashed', 'pmsuspended')),
+      'paused', 'stop', 'stopping', 'stopped', 'crashed', 'pmsuspended', 'create')),
   state_detail                      varchar2(30) default 'unknown' not null
     constraint state_detail_chk check (state_detail in ('unknown', 'shutdown finished', 'guest initiated', 'host initiated', 
       'normal shutdown', 'host poweroff', 'guest crashed', 'migrated', 'saved', 'host failed', 'snapshot loaded', 'normal startup', 
@@ -156,9 +154,7 @@ create table virtual_machines
     constraint interfaces_chk check(interfaces is json),
   host_id                           number(7)
     references vm_hosts(host_id),
-  xml_description                   xmltype,
-  save_xml_description              varchar2(1) default 'Y' not null
-    constraint save_xml_chk check (save_xml_description in ('Y', 'N'))
+  xml_description                   xmltype
 );
 
 create table os_variants
@@ -166,6 +162,26 @@ create table os_variants
   variant_id                        number(7) primary key,
   variant                           varchar2(30) unique not null,
   long_name                         varchar2(64) not null
+);
+
+create table virtual_disks
+(
+  virtual_disk_id                   number(12) primary key,
+  object_id                         varchar2(32) unique
+    references vault_objects(object_id),
+  disk_name                         varchar2(60) unique not null,
+  disk_size                         number(4) default 1 not null,
+  sparse_allocation                 varchar2(1) default 'Y' not null
+    constraint vd_sparse_chk check (sparse_allocation in ('Y', 'N'))
+);
+
+create table attached_storage
+(
+  virtual_disk_id                   number(12) 
+    references virtual_disks(virtual_disk_id),
+  virtual_machine_id                number(12) not null
+    references virtual_machines(virtual_machine_id),
+  disk_number                       number(3) default 1 not null
 );
 
 @$HOME/asterion/oracle/dbTwig/dba/middleTierMap.sql

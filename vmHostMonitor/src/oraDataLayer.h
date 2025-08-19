@@ -21,11 +21,13 @@ int registerVmHost(char *sysInfo, char *hostCapabilities, unsigned long hypervis
 int setVmHostOffline(void);
 int sendMessageToClient(void);
 int updateLifecycleState(char *machineName, char *lifecycleState, char *detail);
-int validateVmState(void *vjsonParms);
-int updateVmState(void *vjsonParms);
+int validateVmState(const char *domainName, const char *stateText);
+int updateVmState(const char *domainName, const char *stateText);
+int updateVmInfo(void *vjsonParms);
 int getMsgForVmHostMonitor(void);
 int breakDqSession(void);
 int getVmXMLDescription(int virtualMachineId, int xmlDescriptionLength);
 int updateVmXMLDescription(char *machineName, char *xmlDescription);
+int getOraErrorCode(void);
 
 #endif /* ORADATALAYER_H_ */

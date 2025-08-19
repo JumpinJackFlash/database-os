@@ -1,7 +1,7 @@
 'use client'
 
 import { formatTimestamp } from "@/utils/clientFunctions";
-import { deleteVirtualMachine, setPersistentFlag, setSaveXmlDescriptionFlag } from "@/utils/serverFunctions";
+import { deleteVirtualMachine, setPersistentFlag } from "@/utils/serverFunctions";
 import { Checkbox,  Button } from "@heroui/react";
 import React, { useState, useContext } from "react";
 import { VirtualMachineT, RefreshVirtualMachineListT } from "@/utils/dataTypes";
@@ -27,7 +27,6 @@ export default function VirtualMachines({ virtualMachine, refreshVirtualMachineL
   const [ deleteVmConfirmed, setDeleteVmConfirmed ] = useState(false);
   const [ deleteBootDiskConfirmed, setDeleteBootDiskConfirmed ] = useState(false);
   const [ persistentVM, setPersistentVM ] = useState('Y' === virtualMachine.persistent ? true : false);
-  const [ saveXmlDescription, setSaveXmlDescription ] = useState('Y' === virtualMachine.saveXmlDescription ? true : false);
 
   const vmManagerContext = useContext(VmManagerContext);
 
@@ -45,22 +44,13 @@ export default function VirtualMachines({ virtualMachine, refreshVirtualMachineL
   }
 
   const immutableFieldsText = virtualMachine?.status !== 'stopped' ? 'Running instance - fields are immutable' : '';
-  const inputDisabled = virtualMachine?.status !== 'stopped' ? true : false;
+  const inputDisabled = virtualMachine?.status === 'stopped' || virtualMachine?.status === 'crashed'  ? false : true;
   const deleteDisabledText = virtualMachine?.status !== 'stopped' ? 'Running instance must be stopped first.' : '';
 
   function setPersistence(setting: boolean)
   {
     setPersistentVM(setting);
     setPersistentFlag(virtualMachine.virtualMachineId, setting ? 'Y' : 'N').then((response) =>
-    {
-      if (!response.ok) return vmManagerContext?.showErrorModal(response.jsonData.errorMessage);
-    });
-  }
-
-  function setSaveXmlDescriptionAction(setting: boolean)
-  {
-    setSaveXmlDescription(setting);
-    setSaveXmlDescriptionFlag(virtualMachine.virtualMachineId, setting ? 'Y' : 'N').then((response) =>
     {
       if (!response.ok) return vmManagerContext?.showErrorModal(response.jsonData.errorMessage);
     });
@@ -86,9 +76,8 @@ export default function VirtualMachines({ virtualMachine, refreshVirtualMachineL
         <p>Network Device: {virtualMachine.networkDevice}</p>
         <p>Interfaces: {JSON.stringify(virtualMachine.interfaces)}</p>
       </div>
-      <div className="columns-2 flex gap-5">
+      <div className="columns-1 flex gap-5">
         <Checkbox title="Persistent VM's remain defined in the host's VM Manager Interface" isSelected={persistentVM} onValueChange={setPersistence} >Persistent VM</Checkbox>
-        <Checkbox title="Save the VM's description" isSelected={saveXmlDescription} onValueChange={setSaveXmlDescriptionAction} >Save Description?</Checkbox>
       </div>
       <div className="columns-2 flex gap-5" title={immutableFieldsText}>
         <Input disabled={inputDisabled} className="w-24" label="VCPU's" labelPlacement="outside" value={vCpus} onValueChange={setVCpus} type="number"  min={1}></Input>

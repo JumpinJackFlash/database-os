@@ -42,6 +42,9 @@
 #define OCI_USER_REQUESTED_CANCEL               1013
 #define OCI_TNS_BREAK                           12152
 
+// These are tied to error values used by the data-layer API.
+#define DBOS_INVALID_VM_STATE                   20101
+
 #define OCI_ILLEGAL_PARM_VALUE                  24801                     // This is the stupid return code for terminating stream reads...
 #define OCI_QUEUE_TIMEOUT                       25228
 #define OCI_ORPHANED_QUEUE                      25306
@@ -109,6 +112,6 @@
 #define VDISK_OPTIONS_LENGTH                    128
 
 #define VIRT_INSTALL                            "virt-install"
-#define VIRT_SHELL                              "virsh"
+#define VIRT_SHELL                              "virsh --connect qemu:///system"
 
 #endif /* VMHOSTMONITORDEFS_H_ */

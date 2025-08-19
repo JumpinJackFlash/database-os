@@ -13,9 +13,11 @@
 #include <cjson/cJSON.h>
 
 #include "vmHostMonitorDefs.h"
+#include "virtualMachines.h"
 #include "oraDataLayer.h"
 #include "errors.h"
 #include "logger.h"
+#include "memory.h"
 
 void *vmHostConnection = NULL;
 virErrorPtr vmError = NULL;
@@ -29,7 +31,7 @@ int vmHostErrorHandler(void)
   return E_LIBVIRT_ERROR;
 }
 
-static char *decodeEvent(int event)
+static const char *decodeEvent(int event)
 {
   switch (event)
   {
@@ -65,7 +67,7 @@ static char *decodeEvent(int event)
   }
 }
 
-static char *decodeState(int state)
+static const char *decodeState(int state)
 {
   switch (state)
   {
@@ -259,23 +261,100 @@ unsigned int dCount = 0;
   return running;
 }
 
-// It would be best to properly clean up if an error is thrown but, since we're going to crap out anyways we won't bother for now...
+int getDomainInfo(virDomain *domain, cJSON *jsonParms)
+{
+  int rc = E_SUCCESS, state = 0, reason = 0, nInterfaces = 0, y = 0, z = 0, isPersistent = 0;
+  virDomainInterface **interfaces = NULL, *interface = NULL;
+  virDomainIPAddress *address = NULL;
+  cJSON *item = NULL, *cjInterfaces = NULL, *cjInterface = NULL;
+  char uuid[VIR_UUID_STRING_BUFLEN];
+
+  item = cJSON_GetObjectItemCaseSensitive(jsonParms, "machineName");
+  if (item)
+    cJSON_SetValuestring(item, virDomainGetName(domain));
+  else
+    item = cJSON_AddStringToObject(jsonParms, "machineName", virDomainGetName(domain));
+
+  rc = virDomainGetState(domain, &state, &reason, 0);
+
+  item = cJSON_GetObjectItemCaseSensitive(jsonParms, "lifecycleState");
+  if (item)
+    cJSON_SetValuestring(item, decodeState(state));
+  else
+    item = cJSON_AddStringToObject(jsonParms, "lifecycleState", decodeState(state));
+
+  rc = virDomainGetUUIDString(domain, uuid);
+
+  item = cJSON_GetObjectItemCaseSensitive(jsonParms, "uuid");
+  if (item)
+    cJSON_SetValuestring(item, uuid);
+  else
+    item = cJSON_AddStringToObject(jsonParms, "uuid", uuid);
+
+  isPersistent = virDomainIsPersistent(domain);
+
+  item = cJSON_GetObjectItemCaseSensitive(jsonParms, "persistent");
+  if (item)
+    cJSON_SetValuestring(item, isPersistent ? "Y" : "N");
+  else
+    item = cJSON_AddStringToObject(jsonParms, "persistent", isPersistent ? "Y" : "N");
+
+  cjInterfaces = cJSON_GetObjectItemCaseSensitive(jsonParms, "interfaces");
+  if (cjInterfaces)
+  {
+    cJSON_DeleteItemFromObjectCaseSensitive(jsonParms, "interfaces");
+    cjInterfaces = cJSON_AddArrayToObject(jsonParms, "interfaces");
+  }
+  else
+    cjInterfaces = cJSON_AddArrayToObject(jsonParms, "interfaces");
+
+  if (!cjInterfaces) return E_JSON_ERROR;
+
+  if (VIR_DOMAIN_RUNNING == state)
+  {
+    nInterfaces = virDomainInterfaceAddresses(domain, &interfaces, VIR_DOMAIN_INTERFACE_ADDRESSES_SRC_LEASE, 0);
+    if (nInterfaces <= 0) nInterfaces = virDomainInterfaceAddresses(domain, &interfaces, VIR_DOMAIN_INTERFACE_ADDRESSES_SRC_AGENT, 0);
+    if (nInterfaces <= 0) nInterfaces = virDomainInterfaceAddresses(domain, &interfaces, VIR_DOMAIN_INTERFACE_ADDRESSES_SRC_ARP, 0);
+
+    if (interfaces)
+    {
+      for (y = 0; y < nInterfaces; y++)
+      {
+        interface = interfaces[y];
+        if (strcmp(interface->name, "lo"))
+        {
+          cjInterface = cJSON_CreateObject();
+          if (!cjInterface) return E_JSON_ERROR;
+
+          item = cJSON_AddStringToObject(cjInterface, "device", interface->name);
+
+          address = interface->addrs;
+          for (z = 0; z < interface->naddrs; z++)
+          {
+            if (VIR_IP_ADDR_TYPE_IPV4 == address->type) item = cJSON_AddStringToObject(cjInterface, "ipAddress", address->addr);
+            address++;
+          }
+
+          rc = cJSON_AddItemToArray(cjInterfaces, cjInterface);
+        }
+      }
+
+      for (y = 0; y < nInterfaces; y++)
+      {
+        interface = interfaces[y];
+        virDomainInterfaceFree(interface);
+      }
+    }
+  }
+
+  return rc;
+}
 
 static int getVirtualMachineList(void)
 {
-int rc = E_SUCCESS, x = 0, state = 0, reason = 0, isPersistent = 0, nInterfaces = 0, y = 0, z = 0;
+int rc = E_SUCCESS, x = 0, state = 0, reason = 0;
 virDomain **domains = NULL, *domain = NULL;
-virDomainInterface **interfaces = NULL, *interface = NULL;
-virDomainIPAddress *address = NULL;
-char uuid[VIR_UUID_STRING_BUFLEN];
 unsigned int dCount = 0;
-cJSON *jsonParms = NULL, *item = NULL, *cjInterfaces = NULL, *cjInterface = NULL, *entryPoint = NULL;
-
-  jsonParms = cJSON_CreateObject();
-  if (!jsonParms) return E_JSON_ERROR;
-
-  entryPoint = cJSON_AddStringToObject(jsonParms, "entryPoint", "validateVmState");
-  if (!entryPoint) return E_JSON_ERROR;
 
   rc = virConnectListAllDomains((virConnect *)vmHostConnection, &domains, 0);
   if (-1 == rc) return vmHostErrorHandler();
@@ -285,96 +364,16 @@ cJSON *jsonParms = NULL, *item = NULL, *cjInterfaces = NULL, *cjInterface = NULL
   {
     domain = domains[x];
 
-    item = cJSON_GetObjectItemCaseSensitive(jsonParms, "machineName");
-    if (item)
-      cJSON_SetValuestring(item, virDomainGetName(domain));
-    else
-      item = cJSON_AddStringToObject(jsonParms, "machineName", virDomainGetName(domain));
-
     rc = virDomainGetState(domain, &state, &reason, 0);
 
-    item = cJSON_GetObjectItemCaseSensitive(jsonParms, "lifecycleState");
-    if (item)
-      cJSON_SetValuestring(item, decodeState(state));
-    else
-      item = cJSON_AddStringToObject(jsonParms, "lifecycleState", decodeState(state));
+    rc = validateVmState(virDomainGetName(domain), decodeState(state));
 
-    rc = virDomainGetUUIDString(domain, uuid);
-
-    item = cJSON_GetObjectItemCaseSensitive(jsonParms, "uuid");
-    if (item)
-      cJSON_SetValuestring(item, uuid);
-    else
-      item = cJSON_AddStringToObject(jsonParms, "uuid", uuid);
-
-    isPersistent = virDomainIsPersistent(domain);
-
-    item = cJSON_GetObjectItemCaseSensitive(jsonParms, "persistent");
-    if (item)
-      cJSON_SetValuestring(item, isPersistent ? "Y" : "N");
-    else
-      item = cJSON_AddStringToObject(jsonParms, "persistent", isPersistent ? "Y" : "N");
-
-    cjInterfaces = cJSON_GetObjectItemCaseSensitive(jsonParms, "interfaces");
-    if (cjInterfaces)
-    {
-      cJSON_DeleteItemFromObjectCaseSensitive(jsonParms, "interfaces");
-      cjInterfaces = cJSON_AddArrayToObject(jsonParms, "interfaces");
-    }
-    else
-      cjInterfaces = cJSON_AddArrayToObject(jsonParms, "interfaces");
-
-    if (!cjInterfaces) return E_JSON_ERROR;
-
-    if (VIR_DOMAIN_RUNNING == state)
-    {
-      nInterfaces = virDomainInterfaceAddresses(domain, &interfaces, VIR_DOMAIN_INTERFACE_ADDRESSES_SRC_LEASE, 0);
-      if (nInterfaces <= 0) nInterfaces = virDomainInterfaceAddresses(domain, &interfaces, VIR_DOMAIN_INTERFACE_ADDRESSES_SRC_AGENT, 0);
-      if (nInterfaces <= 0) nInterfaces = virDomainInterfaceAddresses(domain, &interfaces, VIR_DOMAIN_INTERFACE_ADDRESSES_SRC_ARP, 0);
-
-      if (interfaces)
-      {
-        for (y = 0; y < nInterfaces; y++)
-        {
-          interface = interfaces[y];
-          if (strcmp(interface->name, "lo"))
-          {
-            cjInterface = cJSON_CreateObject();
-            if (!cjInterface) return E_JSON_ERROR;
-
-            item = cJSON_AddStringToObject(cjInterface, "device", interface->name);
-
-            address = interface->addrs;
-            for (z = 0; z < interface->naddrs; z++)
-            {
-              if (VIR_IP_ADDR_TYPE_IPV4 == address->type) item = cJSON_AddStringToObject(cjInterface, "ipAddress", address->addr);
-              address++;
-            }
-
-            rc = cJSON_AddItemToArray(cjInterfaces, cjInterface);
-          }
-        }
-
-        for (y = 0; y < nInterfaces; y++)
-        {
-          interface = interfaces[y];
-          virDomainInterfaceFree(interface);
-        }
-      }
-    }
-
-    rc = validateVmState((void *)jsonParms);
-
-    cJSON_SetValuestring(entryPoint, "updateVmState");
-    rc = updateVmState((void *)jsonParms);
-
-    cJSON_SetValuestring(entryPoint, "validateVmState");                // Reset for next iteration of the loop...
+    if (rc && DBOS_INVALID_VM_STATE == getOraErrorCode()) rc = updateVmState(virDomainGetName(domain), decodeState(state));
 
     virDomainFree(domains[x]);
   }
   free(domains);
 
-  if (jsonParms) cJSON_Delete(jsonParms);
   return E_SUCCESS;
 }
 
@@ -443,6 +442,105 @@ struct utsname utsnameBuffer;
   return rc;
 }
 
+static int runningInstanceHandler(virDomain *domain)
+{
+  int rc = E_SUCCESS, state = 0, reason = 0, nInterfaces = 0, y = 0, z = 0, isPersistent = 0;
+  virDomainInterface **interfaces = NULL, *interface = NULL;
+  virDomainIPAddress *address = NULL;
+  cJSON *jsonParms = NULL, *item = NULL, *cjInterfaces = NULL, *cjInterface = NULL;
+  char uuid[VIR_UUID_STRING_BUFLEN];
+
+  jsonParms = cJSON_CreateObject();
+  if (!jsonParms) return E_JSON_ERROR;
+
+  item = cJSON_AddStringToObject(jsonParms, "entryPoint", "updateVmInfo");
+  if (!item)
+  {
+    rc = jsonError("entryPoint");
+    goto exit_point;
+  }
+
+  item = cJSON_AddStringToObject(jsonParms, "machineName", virDomainGetName(domain));
+  if (!item)
+  {
+    rc = jsonError("machineName");
+    goto exit_point;
+  }
+
+  rc = virDomainGetState(domain, &state, &reason, 0);
+  item = cJSON_AddStringToObject(jsonParms, "lifecycleState", decodeState(state));
+  if (!item)
+  {
+    rc = jsonError("lifecycleState");
+    goto exit_point;
+  }
+
+  rc = virDomainGetUUIDString(domain, uuid);
+  item = cJSON_AddStringToObject(jsonParms, "uuid", uuid);
+  if (!item)
+  {
+    rc = jsonError("persistent");
+    goto exit_point;
+  }
+
+  isPersistent = virDomainIsPersistent(domain);
+  item = cJSON_AddStringToObject(jsonParms, "persistent", isPersistent ? "Y" : "N");
+  if (!item)
+  {
+    rc = jsonError("entryPoint");
+    goto exit_point;
+  }
+
+  cjInterfaces = cJSON_AddArrayToObject(jsonParms, "interfaces");
+
+  if (!cjInterfaces) return E_JSON_ERROR;
+
+  if (VIR_DOMAIN_RUNNING == state)
+  {
+    nInterfaces = virDomainInterfaceAddresses(domain, &interfaces, VIR_DOMAIN_INTERFACE_ADDRESSES_SRC_LEASE, 0);
+    if (nInterfaces <= 0) nInterfaces = virDomainInterfaceAddresses(domain, &interfaces, VIR_DOMAIN_INTERFACE_ADDRESSES_SRC_AGENT, 0);
+    if (nInterfaces <= 0) nInterfaces = virDomainInterfaceAddresses(domain, &interfaces, VIR_DOMAIN_INTERFACE_ADDRESSES_SRC_ARP, 0);
+
+    if (interfaces)
+    {
+      for (y = 0; y < nInterfaces; y++)
+      {
+        interface = interfaces[y];
+        if (strcmp(interface->name, "lo"))
+        {
+          cjInterface = cJSON_CreateObject();
+          if (!cjInterface) return E_JSON_ERROR;
+
+          item = cJSON_AddStringToObject(cjInterface, "device", interface->name);
+
+          address = interface->addrs;
+          for (z = 0; z < interface->naddrs; z++)
+          {
+            if (VIR_IP_ADDR_TYPE_IPV4 == address->type) item = cJSON_AddStringToObject(cjInterface, "ipAddress", address->addr);
+            address++;
+          }
+
+          rc = cJSON_AddItemToArray(cjInterfaces, cjInterface);
+        }
+      }
+
+      for (y = 0; y < nInterfaces; y++)
+      {
+        interface = interfaces[y];
+        virDomainInterfaceFree(interface);
+      }
+    }
+  }
+
+  rc = updateVmInfo((void *)jsonParms);
+
+  exit_point:
+
+  if (jsonParms) cJSON_Delete(jsonParms);
+
+  return rc;
+}
+
 static int domainEventHandler(virConnect *conn, virDomain *domain, int event, int detail, void *opaque)
 {
 const char *domainName = NULL;
@@ -462,6 +560,7 @@ char *xmlDescription = NULL;
     case VIR_DOMAIN_EVENT_STARTED:
       logOutput(LOG_OUTPUT_ALWAYS, decodeStartupDetail(detail));
       updateLifecycleState((char *) domainName, "running", decodeStartupDetail(detail));
+      runningInstanceHandler(domain);
       break;
 
     case VIR_DOMAIN_EVENT_SHUTDOWN:

@@ -135,6 +135,10 @@ package body vm_manager_runtime as
 
         vm_manager.update_vm_description(l_json_parameters);
 
+      when 'updateVmInfo' then
+
+        vm_manager.update_vm_info(l_json_parameters);
+
       when 'updateVmState' then
 
         vm_manager.update_vm_state(l_json_parameters);

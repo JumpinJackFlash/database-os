@@ -57,11 +57,6 @@ package restapi as
     p_json_parameters                 json_object_t
   );
 
-  procedure set_save_xml_description
-  (
-    p_json_parameters                 json_object_t
-  );
-
   procedure start_virtual_machine
   (
     p_json_parameters                 json_object_t

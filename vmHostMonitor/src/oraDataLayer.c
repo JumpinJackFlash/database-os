@@ -135,9 +135,9 @@ static char *getOraErrorText(void)
   return oraErrorText;
 }
 
-static sb4 getOraErrorCode(void)
+int getOraErrorCode(void)
 {
-  return oraErrorCode;
+  return (int) oraErrorCode;
 }
 
 static int errorHandler(int rc, OCIError *error)
@@ -573,15 +573,41 @@ exit_point:
   return rc;
 }
 
-// Yes...this violates the pattern in order to simplify specifying multiple IP addresses/devices. JSON is very convenient sometimes!
-
-int validateVmState(void *vjsonParms)
+int validateVmState(const char *domainName, const char *stateText)
 {
 int rc = E_SUCCESS;
-cJSON *jsonParms = (cJSON *)vjsonParms;
+cJSON *jsonParms = NULL, *item = NULL;
+
+  jsonParms = cJSON_CreateObject();
+  if (!jsonParms) return E_JSON_ERROR;
+
+  item = cJSON_AddStringToObject(jsonParms, "entryPoint", "validateVmState");
+  if (!item)
+  {
+    rc = jsonError("entryPoint");
+    goto exit_point;
+  }
+
+  item = cJSON_AddStringToObject(jsonParms, "machineName", domainName);
+  if (!item)
+  {
+    rc = jsonError("domainName");
+    goto exit_point;
+  }
+
+  item = cJSON_AddStringToObject(jsonParms, "lifecycleState", stateText);
+  if (!item)
+  {
+    rc = jsonError("lifecycleState");
+    goto exit_point;
+  }
 
   rc = cJSON_PrintPreallocated(jsonParms, jsonParametersStr, sizeof(jsonParametersStr), 0);
-  if (!rc) return E_MALLOC;
+  if (!rc)
+  {
+    rc = E_MALLOC;
+    goto exit_point;
+  }
 
   logOutput(LOG_OUTPUT_ALWAYS, jsonParametersStr);
 
@@ -596,6 +622,68 @@ cJSON *jsonParms = (cJSON *)vjsonParms;
 
   pthread_mutex_unlock(&dbConnMtx);
 
+  exit_point:
+
+  if (jsonParms) cJSON_Delete(jsonParms);
+
+  if (rc && OCI_SUCCESS_WITH_INFO != rc && OCI_NO_DATA != rc) return errorHandler(rc, dbSess.oraError);
+
+  return rc;
+}
+
+int updateVmState(const char *domainName, const char *stateText)
+{
+int rc = E_SUCCESS;
+cJSON *jsonParms = NULL, *item = NULL;
+
+  jsonParms = cJSON_CreateObject();
+  if (!jsonParms) return E_JSON_ERROR;
+
+  item = cJSON_AddStringToObject(jsonParms, "entryPoint", "updateVmState");
+  if (!item)
+  {
+    rc = jsonError("entryPoint");
+    goto exit_point;
+  }
+
+  item = cJSON_AddStringToObject(jsonParms, "machineName", domainName);
+  if (!item)
+  {
+    rc = jsonError("domainName");
+    goto exit_point;
+  }
+
+  item = cJSON_AddStringToObject(jsonParms, "lifecycleState", stateText);
+  if (!item)
+  {
+    rc = jsonError("lifecycleState");
+    goto exit_point;
+  }
+
+  rc = cJSON_PrintPreallocated(jsonParms, jsonParametersStr, sizeof(jsonParametersStr), 0);
+  if (!rc)
+  {
+    rc = E_MALLOC;
+    goto exit_point;
+  }
+
+  logOutput(LOG_OUTPUT_ALWAYS, jsonParametersStr);
+
+  pthread_mutex_lock(&dbConnMtx);
+
+  rc = OCIBindByName(dbConnStmt, &jsonParmsBV, dbSess.oraError,
+    (const OraText *)":jsonParameters", -1, jsonParametersStr, (ub4) strlen(jsonParametersStr)+1,
+    SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0, (ub4 *) 0, (sb4) OCI_DEFAULT);
+
+  rc = OCIStmtExecute(dbSess.oraSvcCtx, dbConnStmt, dbSess.oraError, 1, 0, NULL, NULL,
+    OCI_COMMIT_ON_SUCCESS);
+
+  pthread_mutex_unlock(&dbConnMtx);
+
+  exit_point:
+
+  if (jsonParms) cJSON_Delete(jsonParms);
+
   if (rc && OCI_SUCCESS_WITH_INFO != rc && OCI_NO_DATA != rc) return errorHandler(rc, dbSess.oraError);
 
   return rc;
@@ -603,7 +691,7 @@ cJSON *jsonParms = (cJSON *)vjsonParms;
 
 // Yes...this violates the pattern in order to simplify specifying multiple IP addresses/devices. JSON is very convenient sometimes!
 
-int updateVmState(void *vjsonParms)
+int updateVmInfo(void *vjsonParms)
 {
 int rc = E_SUCCESS;
 cJSON *jsonParms = (cJSON *)vjsonParms;

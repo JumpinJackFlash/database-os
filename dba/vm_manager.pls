@@ -24,6 +24,7 @@ package body vm_manager as
   (
     p_session_id                      varchar2,
     p_virtual_machine_id              virtual_machines.virtual_machine_id%type,
+    p_cdrom_disk_id                   vault_objects.object_id%type default null,
     p_virtual_disk_size               number default 0,
     p_sparse_disk_allocation          varchar2 default 'Y',
     p_boot_device                     varchar2 default 'hd'
@@ -32,12 +33,15 @@ package body vm_manager as
   is
 
     l_json_response                   json_object_t;
+    l_entry                           json_object_t;
+    l_attached_storage                json_array_t;
     l_virtual_machine                 virtual_machines%rowtype;
     l_json_parameters                 json_object_t := json_object_t;
     l_object_id                       vault_objects.object_id%type;
     l_dbos_message                    dbos$message_t;
     l_host_name                       vm_hosts.host_name%type;
     l_status                          vm_hosts.status%type;
+    l_clob                            clob;
 
   begin
 
@@ -59,9 +63,9 @@ package body vm_manager as
 
     l_json_parameters.put('machineName', l_virtual_machine.machine_name);
 
-    if l_virtual_machine.virtual_disk_id is not null then
+    if l_virtual_machine.boot_disk_id is not null then
 
-      l_json_response := json_object_t(dgbunker_service.generate_object_filename(p_object_id => l_virtual_machine.virtual_disk_id,
+      l_json_response := json_object_t(dgbunker_service.generate_object_filename(p_object_id => l_virtual_machine.boot_disk_id,
         p_gateway_name => l_host_name, p_access_mode => dgbunker_service.READ_WRITE_ACCESS,
         p_linux_file_mode => VDISK_FILE_MODE, p_linux_subdir_mode => SUBDIR_FILE_MODE, p_disable_stream_write => 'Y',
         p_access_limit => dgbunker_service.unlimited_access_operations, p_valid_until => dgbunker_service.NO_EXPIRATION,
@@ -70,16 +74,45 @@ package body vm_manager as
       l_json_parameters.put('vDiskFilename', l_json_response.get_string('filename'));
       if 0 != p_virtual_disk_size then
 
-        l_json_parameters.put('vDiskSize', p_virtual_disk_size);
-        l_json_parameters.put('sparseDiskAllocation', p_sparse_disk_allocation);
+        l_json_parameters.put('diskSize', p_virtual_disk_size);
+        l_json_parameters.put('sparseAllocation', p_sparse_disk_allocation);
 
       end if;
 
     end if;
 
-    if l_virtual_machine.virtual_cdrom_id is not null then
+    select  json_arrayagg(json_object(
+              'objectId'                is object_id,
+              'diskSize'                is disk_size,
+              'sparseAllocation'        is sparse_allocation))
+      into  l_clob
+      from  attached_storage s, virtual_disks d
+     where  virtual_machine_id = p_virtual_machine_id
+       and  s.virtual_disk_id = d.virtual_disk_id;
 
-      l_json_response := json_object_t(dgbunker_service.generate_object_filename(p_object_id => l_virtual_machine.virtual_cdrom_id,
+    if l_clob is not null then
+
+      l_attached_storage := json_array_t(l_clob);
+
+      for x in 0 .. l_attached_storage.get_size - 1 loop
+
+        l_entry := treat(l_attached_storage.get(x) as json_object_t);
+        l_json_response := json_object_t(dgbunker_service.generate_object_filename(p_object_id => l_entry.get_string('objectId'),
+          p_gateway_name => l_host_name, p_access_mode => dgbunker_service.READ_WRITE_ACCESS,
+          p_linux_file_mode => VDISK_FILE_MODE, p_linux_subdir_mode => SUBDIR_FILE_MODE, p_disable_stream_write => 'Y',
+          p_access_limit => dgbunker_service.unlimited_access_operations, p_valid_until => dgbunker_service.NO_EXPIRATION,
+          p_file_user_group => ROOT_USER, p_subdir_user_group => ROOT_USER, p_session_id => p_session_id));
+
+        l_entry.put('vDiskFilename', l_json_response.get_string('filename'));
+        l_attached_storage.put(x, l_entry, true);
+
+      end loop;
+
+    end if;
+
+    if p_cdrom_disk_id is not null then
+
+      l_json_response := json_object_t(dgbunker_service.generate_object_filename(p_object_id => p_cdrom_disk_id,
         p_access_limit => dgbunker_service.UNLIMITED_ACCESS_OPERATIONS,
         p_valid_until => dgbunker_service.NO_EXPIRATION, p_access_mode => dgbunker_service.READ_ACCESS,
         p_linux_file_mode => VCDROM_FILE_MODE, p_linux_subdir_mode => SUBDIR_FILE_MODE, p_file_user_group => QEMU_USER, p_subdir_user_group => ROOT_USER,
@@ -96,13 +129,10 @@ package body vm_manager as
     l_json_parameters.put('networkDevice', l_virtual_machine.network_device);
     l_json_parameters.put('persistent', l_virtual_machine.persistent);
     l_json_parameters.put('bootDevice', p_boot_device);
+    l_json_parameters.put('attachedStorage', l_attached_storage);
 
     l_dbos_message := dbos$message_t(dbms_session.unique_session_id, l_host_name, vm_manager.CREATE_VM_MESSAGE, l_json_parameters.to_string);
     send_message_to_host_monitor(l_dbos_message);
-
-    update  virtual_machines
-       set  virtual_cdrom_id = null
-     where  virtual_machine_id = p_virtual_machine_id;
 
   end create_virtual_machine_action;
 
@@ -317,7 +347,7 @@ package body vm_manager as
 
       when 'starting' then
 
-        if 'start' = p_lifecycle_state or 'starting' = p_lifecycle_state or 'crashed' = p_lifecycle_state then
+        if p_lifecycle_state in ('start', 'starting', 'crashed', 'create') then
 
           return;
 
@@ -355,7 +385,7 @@ package body vm_manager as
 
       when 'stopped' then
 
-        if 'stopping' = p_lifecycle_state then
+        if 'stopping' = p_lifecycle_state or 'running' = p_lifecycle_state then
 
           return;
 
@@ -855,7 +885,7 @@ package body vm_manager as
   (
     p_session_id                      varchar2,
     p_seed_image_name                 varchar2,
-    p_virtual_disk_id                 virtual_machines.virtual_disk_id%type
+    p_boot_disk_id                    virtual_machines.boot_disk_id%type
   )
 
   is
@@ -875,7 +905,7 @@ package body vm_manager as
 
     commit;
 
-    l_source_blob := dgbunker_service.get_blob_locator(p_object_id => p_virtual_disk_id);
+    l_source_blob := dgbunker_service.get_blob_locator(p_object_id => p_boot_disk_id);
 
     l_dest_blob := dgbunker_service.get_blob_locator(p_object_id => l_dest_object_id, p_for_update => dgbunker_service.OPTION_ENABLED);
     dgbunker_service.set_blob_value(l_dest_object_id, l_source_blob);
@@ -918,7 +948,7 @@ package body vm_manager as
 
   end create_virtual_disk_from_seed;
 
-  function create_boot_disk
+  function create_virtual_disk
   (
     p_session_id                      varchar2,
     p_disk_image_name                 varchar2
@@ -930,15 +960,59 @@ package body vm_manager as
   begin
 
     return dgbunker_service.create_an_object(p_session_id => p_session_id, p_source_path => p_disk_image_name,
-      p_client_address => sys_context('userenv', 'ip_address'), p_program_name => 'vm_manager.create_boot_disk');
+      p_client_address => sys_context('userenv', 'ip_address'), p_program_name => 'vm_manager.create_virtual_disk');
 
-  end create_boot_disk;
+  end create_virtual_disk;
+
+  procedure create_attached_storage
+  (
+    p_session_id                      varchar2,
+    p_virtual_machine_id              virtual_machines.virtual_machine_id%type,
+    p_attached_storage                json_array_t
+  )
+
+  is
+
+    l_entry                           json_object_t;
+    l_disk_name                       virtual_disks.disk_name%type;
+    l_disk_size                       virtual_disks.disk_size%type;
+    l_object_id                       vault_objects.object_id%type;
+    l_result                          json_object_t;
+
+  begin
+
+    if p_attached_storage is not null then
+
+      for x in 0 .. p_attached_storage.get_size - 1 loop
+
+        l_entry := treat(p_attached_storage.get(x) as json_object_t);
+        l_result := json_object_t(create_virtual_disk(p_session_id, l_entry.get_string('diskLabel')||'.qcow2'));
+        l_object_id := l_result.get_string('objectId');
+        l_disk_name := l_entry.get_string('diskLabel');
+        l_disk_size := l_entry.get_number('diskSize');
+
+        insert into virtual_disks
+          (virtual_disk_id, object_id, disk_name, disk_size)
+        values
+          (id_seq.nextval, l_object_id, l_disk_name, l_disk_size)
+        returning virtual_disk_id into l_object_id;
+
+        insert into attached_storage
+          (virtual_disk_id, virtual_machine_id, disk_number)
+        values
+          (l_object_id, p_virtual_machine_id, x+1);
+
+      end loop;
+
+    end if;
+
+  end create_attached_storage;
 
   procedure create_vm_from_iso_image
   (
     p_session_id                      varchar2,
     p_machine_name                    virtual_machines.machine_name%type,
-    p_iso_image_id                    virtual_machines.virtual_disk_id%type,
+    p_iso_image_id                    vault_objects.object_id%type,
     p_os_variant_id                   os_variants.variant_id%type,
     p_host_id                         vm_hosts.host_id%type,
     p_virtual_disk_size               number default 0,
@@ -946,16 +1020,18 @@ package body vm_manager as
     p_vcpu_count                      virtual_machines.vcpu_count%type default 1,
     p_virtual_memory                  virtual_machines.virtual_memory%type default 1024,
     p_bridged_connection              varchar2 default 'N',
-    p_network_device                  virtual_machines.network_device%type default 'default'
+    p_network_device                  virtual_machines.network_device%type default 'default',
+    p_attached_storage                json_array_t default null
   )
 
   is
 
-    l_result                          json_object_t;
     l_virtual_machine_id              virtual_machines.virtual_machine_id%type;
     l_network_source                  virtual_machines.network_source%type := 'network';
-    l_object_id                       vault_objects.object_id%type;
     l_variant                         os_variants.variant%type;
+    l_virtual_disk_id                 virtual_disks.virtual_disk_id%type;
+    l_object_id                       vault_objects.object_id%type;
+    l_result                          json_object_t;
 
   begin
 
@@ -970,19 +1046,21 @@ package body vm_manager as
       from  os_variants
      where  variant_id = p_os_variant_id;
 
-    l_result := json_object_t(create_boot_disk(p_session_id, p_machine_name||'.qcow2'));
+    l_result := json_object_t(create_virtual_disk(p_session_id, p_machine_name||'.qcow2'));
     l_object_id := l_result.get_string('objectId');
 
     insert into virtual_machines
-      (virtual_machine_id, machine_name, virtual_disk_id, virtual_cdrom_id, vcpu_count, virtual_memory, os_variant,
-       network_source, network_device, host_id, lifecycle_state, save_xml_description)
+      (virtual_machine_id, machine_name, boot_disk_id, vcpu_count, virtual_memory, os_variant,
+       network_source, network_device, host_id, lifecycle_state)
     values
-      (id_seq.nextval, p_machine_name, l_object_id, p_iso_image_id, p_vcpu_count, p_virtual_memory * 1024,
-       l_variant, l_network_source, p_network_device, p_host_id, 'start', 'N')
+      (id_seq.nextval, p_machine_name, l_object_id, p_vcpu_count, p_virtual_memory * 1024,
+       l_variant, l_network_source, p_network_device, p_host_id, 'create')
     returning virtual_machine_id into l_virtual_machine_id;
 
-    create_virtual_machine_action(p_session_id => p_session_id, p_virtual_machine_id => l_virtual_machine_id, p_virtual_disk_size => p_virtual_disk_size,
-      p_sparse_disk_allocation => p_sparse_disk_allocation, p_boot_device => 'cdrom');
+    create_attached_storage(p_session_id, l_virtual_machine_id, p_attached_storage);
+
+    create_virtual_machine_action(p_session_id => p_session_id, p_virtual_machine_id => l_virtual_machine_id, p_cdrom_disk_id => p_iso_image_id,
+      p_virtual_disk_size => p_virtual_disk_size, p_sparse_disk_allocation => p_sparse_disk_allocation, p_boot_device => 'cdrom');
 
   end create_vm_from_iso_image;
 
@@ -990,7 +1068,7 @@ package body vm_manager as
   (
     p_session_id                      varchar2,
     p_machine_name                    virtual_machines.machine_name%type,
-    p_seed_image_id                   virtual_machines.virtual_disk_id%type,
+    p_seed_image_id                   virtual_machines.boot_disk_id%type,
     p_os_variant_id                   os_variants.variant_id%type,
     p_host_id                         vm_hosts.host_id%type,
     p_meta_data                       clob,
@@ -999,7 +1077,8 @@ package body vm_manager as
     p_vcpu_count                      virtual_machines.vcpu_count%type default 1,
     p_virtual_memory                  virtual_machines.virtual_memory%type default 1024,
     p_bridged_connection              varchar2 default 'N',
-    p_network_device                  virtual_machines.network_device%type default 'default'
+    p_network_device                  virtual_machines.network_device%type default 'default',
+    p_attached_storage                json_array_t default null
   )
 
   is
@@ -1041,14 +1120,17 @@ package body vm_manager as
     l_vdisk_id := create_virtual_disk_from_seed(p_session_id, p_machine_name||'.qcow2', p_seed_image_id);
 
     insert into virtual_machines
-      (virtual_machine_id, machine_name, virtual_disk_id, virtual_cdrom_id, vcpu_count, virtual_memory, os_variant,
+      (virtual_machine_id, machine_name, boot_disk_id, vcpu_count, virtual_memory, os_variant,
        network_source, network_device, host_id, lifecycle_state)
     values
-      (id_seq.nextval, p_machine_name, l_vdisk_id, l_cdrom_id, p_vcpu_count, p_virtual_memory * 1024,
-       l_variant, l_network_source, p_network_device, p_host_id, 'start')
+      (id_seq.nextval, p_machine_name, l_vdisk_id, p_vcpu_count, p_virtual_memory * 1024,
+       l_variant, l_network_source, p_network_device, p_host_id, 'create')
     returning virtual_machine_id into l_virtual_machine_id;
 
-    create_virtual_machine_action(p_session_id => p_session_id, p_virtual_machine_id => l_virtual_machine_id, p_boot_device => 'hd');
+    create_attached_storage(p_session_id, l_virtual_machine_id, p_attached_storage);
+
+    create_virtual_machine_action(p_session_id => p_session_id, p_virtual_machine_id => l_virtual_machine_id,
+      p_cdrom_disk_id => l_cdrom_id, p_boot_device => 'hd');
 
   end create_vm_from_qcow_image;
 
@@ -1056,7 +1138,7 @@ package body vm_manager as
   (
     p_session_id                      varchar2,
     p_machine_name                    virtual_machines.machine_name%type,
-    p_seed_image_id                   virtual_machines.virtual_disk_id%type,
+    p_seed_image_id                   virtual_machines.boot_disk_id%type,
     p_os_variant_id                   os_variants.variant_id%type,
     p_host_id                         vm_hosts.host_id%type,
     p_user                            varchar2,
@@ -1071,7 +1153,8 @@ package body vm_manager as
     p_vcpu_count                      virtual_machines.vcpu_count%type default 1,
     p_virtual_memory                  virtual_machines.virtual_memory%type default 1024,
     p_bridged_connection              varchar2 default 'N',
-    p_network_device                  virtual_machines.network_device%type default 'default'
+    p_network_device                  virtual_machines.network_device%type default 'default',
+    p_attached_storage                json_array_t default null
   )
 
   is
@@ -1114,14 +1197,17 @@ package body vm_manager as
     l_vdisk_id := create_virtual_disk_from_seed(p_session_id, p_machine_name||'.qcow2', p_seed_image_id);
 
     insert into virtual_machines
-      (virtual_machine_id, machine_name, virtual_disk_id, virtual_cdrom_id, vcpu_count, virtual_memory, os_variant,
+      (virtual_machine_id, machine_name, boot_disk_id, vcpu_count, virtual_memory, os_variant,
        network_source, network_device, host_id, lifecycle_state)
     values
-      (id_seq.nextval, p_machine_name, l_vdisk_id, l_cdrom_id, p_vcpu_count, p_virtual_memory * 1024,
-       l_variant, l_network_source, p_network_device, p_host_id, 'start')
+      (id_seq.nextval, p_machine_name, l_vdisk_id, p_vcpu_count, p_virtual_memory * 1024,
+       l_variant, l_network_source, p_network_device, p_host_id, 'create')
     returning virtual_machine_id into l_virtual_machine_id;
 
-    create_virtual_machine_action(p_session_id => p_session_id, p_virtual_machine_id => l_virtual_machine_id, p_boot_device => 'hd');
+    create_attached_storage(p_session_id, l_virtual_machine_id, p_attached_storage);
+
+    create_virtual_machine_action(p_session_id => p_session_id, p_virtual_machine_id => l_virtual_machine_id,
+      p_cdrom_disk_id => l_cdrom_id, p_boot_device => 'hd');
 
   end create_vm_from_qcow_image;
 
@@ -1134,26 +1220,37 @@ package body vm_manager as
 
   is
 
-    l_virtual_disk_id                 virtual_machines.virtual_disk_id%type;
+    l_boot_disk_id                 virtual_machines.boot_disk_id%type;
     l_json_array                      json_array_t := json_array_t;
 
   begin
 
     if p_delete_boot_disk then
 
-      select  virtual_disk_id
-        into  l_virtual_disk_id
+      select  boot_disk_id
+        into  l_boot_disk_id
         from  virtual_machines
        where  virtual_machine_id = p_virtual_machine_id;
 
-      if l_virtual_disk_id is not null then
+      if l_boot_disk_id is not null then
 
-        l_json_array.append(l_virtual_disk_id);
+        l_json_array.append(l_boot_disk_id);
         dgbunker_service.delete_objects(p_session_id, l_json_array);
 
       end if;
 
     end if;
+
+    delete
+      from  attached_storage
+     where  virtual_machine_id = p_virtual_machine_id;
+
+    delete
+      from  virtual_disks v
+     where  0 =
+            (select  count(*)
+               from  attached_storage s
+              where  v.virtual_disk_id = s.virtual_disk_id);
 
     delete
       from  virtual_machines
@@ -1275,8 +1372,7 @@ package body vm_manager as
                           'machineName'         is machine_name,
                           'status'              is lifecycle_state,
                           'statusDetail'        is state_detail,
-                          'virtualDiskId'       is virtual_disk_id,
-                          'virtualCdromId'      is virtual_cdrom_id,
+                          'bootDiskId'          is boot_disk_id,
                           'vCpuCount'           is vcpu_count,
                           'virtualMemory'       is virtual_memory,
                           'osVariant'           is os_variant,
@@ -1285,7 +1381,6 @@ package body vm_manager as
                           'uuid'                is uuid,
                           'interfaces'          is interfaces,
                           'persistent'          is persistent,
-                          'saveXmlDescription'  is save_xml_description,
                           'host'                is vm_manager.get_vm_host_name(host_id)) order by machine_name returning clob) returning clob)
       into  l_rows, l_result
       from  virtual_machines;
@@ -1390,7 +1485,7 @@ package body vm_manager as
      where  variant_id = p_os_variant_id;
 
     insert into virtual_machines
-      (virtual_machine_id, machine_name, virtual_disk_id, vcpu_count, virtual_memory, network_source, network_device, os_variant)
+      (virtual_machine_id, machine_name, boot_disk_id, vcpu_count, virtual_memory, network_source, network_device, os_variant)
     values
       (id_seq.nextval, p_machine_name, p_object_id, p_vcpu_count, p_virtual_memory, l_network_source, p_network_device,
        l_variant);
@@ -1474,22 +1569,6 @@ package body vm_manager as
 
   end set_persistent;
 
-  procedure set_save_xml_description
-  (
-    p_virtual_machine_id              virtual_machines.virtual_machine_id%type,
-    p_save_xml_description            virtual_machines.save_xml_description%type
-  )
-
-  is
-
-  begin
-
-    update  virtual_machines
-       set  save_xml_description = p_save_xml_description
-     where  virtual_machine_id = p_virtual_machine_id;
-
-  end set_save_xml_description;
-
   procedure set_vm_host_offline
   (
     p_host_name                       vm_hosts.host_name%type
@@ -1509,8 +1588,7 @@ package body vm_manager as
   procedure start_virtual_machine
   (
     p_session_id                      varchar2,
-    p_virtual_machine_id              virtual_machines.virtual_machine_id%type,
-    p_boot_device                     varchar2 default 'hd'
+    p_virtual_machine_id              virtual_machines.virtual_machine_id%type
   )
 
   is
@@ -1553,13 +1631,32 @@ package body vm_manager as
 
     end if;
 
-    l_json_response := json_object_t(dgbunker_service.generate_object_filename(p_object_id => l_virtual_machine.virtual_disk_id,
+    l_json_response := json_object_t(dgbunker_service.generate_object_filename(p_object_id => l_virtual_machine.boot_disk_id,
       p_gateway_name => l_host_name, p_access_mode => dgbunker_service.READ_WRITE_ACCESS,
       p_linux_file_mode => VDISK_FILE_MODE, p_linux_subdir_mode => SUBDIR_FILE_MODE, p_disable_stream_write => 'Y',
       p_access_limit => dgbunker_service.unlimited_access_operations, p_valid_until => dgbunker_service.NO_EXPIRATION,
       p_file_user_group => ROOT_USER, p_subdir_user_group => ROOT_USER, p_session_id => p_session_id));
 
     l_xml_description := set_obscure_vdisk(l_virtual_machine.xml_description, 0, l_json_response.get_string('filename'));
+
+    for attached_disks in
+    (
+      select  disk_number, object_id
+        from  attached_storage s, virtual_disks d
+       where  virtual_machine_id = p_virtual_machine_id
+         and  s.virtual_disk_id = d.virtual_disk_id
+    )
+    loop
+
+      l_json_response := json_object_t(dgbunker_service.generate_object_filename(p_object_id => attached_disks.object_id,
+        p_gateway_name => l_host_name, p_access_mode => dgbunker_service.READ_WRITE_ACCESS,
+        p_linux_file_mode => VDISK_FILE_MODE, p_linux_subdir_mode => SUBDIR_FILE_MODE, p_disable_stream_write => 'Y',
+        p_access_limit => dgbunker_service.unlimited_access_operations, p_valid_until => dgbunker_service.NO_EXPIRATION,
+        p_file_user_group => ROOT_USER, p_subdir_user_group => ROOT_USER, p_session_id => p_session_id));
+
+      l_xml_description := set_obscure_vdisk(l_xml_description, attached_disks.disk_number, l_json_response.get_string('filename'));
+
+    end loop;
 
     update  virtual_machines
        set  lifecycle_state = 'start',
@@ -1683,12 +1780,11 @@ package body vm_manager as
 
     update  virtual_machines
        set  xml_description = xmltype(l_xml_description)
-     where  machine_name = l_machine_name
-       and  save_xml_description = 'Y';
+     where  machine_name = l_machine_name;
 
   end update_vm_description;
 
-  procedure update_vm_state
+  procedure update_vm_info
   (
     p_json_parameters                 json_object_t
   )
@@ -1700,15 +1796,31 @@ package body vm_manager as
     l_persistent                      virtual_machines.persistent%type := db_twig.get_string(p_json_parameters, 'persistent');
     l_interfaces_array                json_array_t := db_twig.get_array(p_json_parameters, 'interfaces');
     l_interfaces                      virtual_machines.interfaces%type := l_interfaces_array.to_clob;
-    l_lifecycle_state                 virtual_machines.lifecycle_state%type := db_twig.get_string(p_json_parameters, 'lifecycleState');
 
   begin
 
     update  virtual_machines
        set  uuid = l_uuid,
             persistent = l_persistent,
-            interfaces = l_interfaces,
-            lifecycle_state = l_lifecycle_state
+            interfaces = l_interfaces
+    where   machine_name = l_machine_name;
+
+  end update_vm_info;
+
+  procedure update_vm_state
+  (
+    p_json_parameters                 json_object_t
+  )
+
+  is
+
+    l_machine_name                    virtual_machines.machine_name%type := db_twig.get_string(p_json_parameters, 'machineName');
+    l_lifecycle_state                 virtual_machines.lifecycle_state%type := db_twig.get_string(p_json_parameters, 'lifecycleState');
+
+  begin
+
+    update  virtual_machines
+       set  lifecycle_state = l_lifecycle_state
     where   machine_name = l_machine_name;
 
   end update_vm_state;
@@ -1722,9 +1834,6 @@ package body vm_manager as
   is
 
     l_machine_name                    virtual_machines.machine_name%type := db_twig.get_string(p_json_parameters, 'machineName');
-    l_uuid                            virtual_machines.uuid%type := db_twig.get_string(p_json_parameters, 'uuid');
-    l_persistent                      virtual_machines.persistent%type := db_twig.get_string(p_json_parameters, 'persistent');
-    l_interfaces                      json_array_t := db_twig.get_array(p_json_parameters, 'interfaces');
     l_lifecycle_state                 virtual_machines.lifecycle_state%type := db_twig.get_string(p_json_parameters, 'lifecycleState');
     l_virtual_machine                 virtual_machines%rowtype;
 
@@ -1735,10 +1844,7 @@ package body vm_manager as
       from  virtual_machines
      where  machine_name = l_machine_name;
 
-    if l_virtual_machine.uuid != l_uuid or
-       l_virtual_machine.persistent != l_persistent or
-       l_virtual_machine.interfaces != l_interfaces.to_string or
-       l_virtual_machine.lifecycle_state != l_lifecycle_state then
+    if l_virtual_machine.lifecycle_state != l_lifecycle_state then
 
       raise_application_error(vm_manager.VM_STATE_MISMATCH, vm_manager.VM_STATE_MISMATCH_EMSG);
 

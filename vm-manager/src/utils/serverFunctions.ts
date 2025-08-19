@@ -1,7 +1,7 @@
 "use server"
 
 import { createSessionCookie, getSessionCookie, deleteSessionCookie } from './coookieMonster'
-import { NameserverT, SshKeyT } from './dataTypes'
+import { NameserverT, SshKeyT, AttachedStorageT } from './dataTypes'
 
 export type ServerResponseT =
 {
@@ -51,10 +51,10 @@ async function callDbTwig(apiCall: string, body?: object)
 
 export async function createVmFromIsoImage(machineName: string, isoImageId: string, osVariantId: number, hostId: string,
   virtualDiskSize: number, sparseDiskAllocation: string, vcpuCount: number, virtualMemory: number,
-  bridgedConnection: string, networkDevice: string)
+  bridgedConnection: string, networkDevice: string, attachedStorage: AttachedStorageT[])
 {
   const bodyData = {machineName, isoImageId, osVariantId, virtualDiskSize, sparseDiskAllocation, vcpuCount, 
-    virtualMemory, bridgedConnection, networkDevice, hostId};
+    virtualMemory, bridgedConnection, networkDevice, hostId, attachedStorage};
 
   const response = await callDbTwig('dbos/createVmFromIsoImage', bodyData);
   return response;
@@ -62,10 +62,10 @@ export async function createVmFromIsoImage(machineName: string, isoImageId: stri
 
 export async function createQcowVmUsingConfigFiles(machineName: string, qcowImageId: string, osVariantId: number, 
   hostId: string, vcpuCount: number, virtualMemory: number, bridgedConnection: string, networkDevice: string, 
-  metaData: string, userData: string, networkConfig: string)
+  metaData: string, userData: string, networkConfig: string, attachedStorage: AttachedStorageT[])
 {
   const bodyData = {machineName, qcowImageId, osVariantId, vcpuCount, virtualMemory, bridgedConnection, networkDevice, metaData, userData, 
-    networkConfig, hostId, config: 'files'};
+    networkConfig, attachedStorage, hostId, config: 'files'};
 
   const response = await callDbTwig('dbos/createVmFromQcowImage', bodyData);
   return response;
@@ -73,10 +73,12 @@ export async function createQcowVmUsingConfigFiles(machineName: string, qcowImag
 
 export async function createQcowVmFromTemplate(machineName: string, qcowImageId: string, osVariantId: number, hostId: string,
   vcpuCount: number, virtualMemory: number, bridgedConnection: string, networkDevice: string, localhost_name: string, ip4Address: string, 
-  ip4Gateway: string, ip4Netmask: string, nameservers: NameserverT[], dnsSearch: string, sshKeys: SshKeyT[], user: string, password: string)
+  ip4Gateway: string, ip4Netmask: string, nameservers: NameserverT[], dnsSearch: string, sshKeys: SshKeyT[], 
+  attachedStorage: AttachedStorageT[], user: string, password: string)
 {
   const bodyData = {machineName, qcowImageId, osVariantId, vcpuCount, virtualMemory, bridgedConnection, networkDevice, hostId,
-    nameservers, dnsSearch, sshKeys, user, password, localhost_name, ip4Address, ip4Gateway, ip4Netmask, config: 'template'};
+    nameservers, dnsSearch, sshKeys, user, password, localhost_name, ip4Address, ip4Gateway, ip4Netmask, 
+    attachedStorage, config: 'template'};
 
   const response = await callDbTwig('dbos/createVmFromQcowImage', bodyData);
   return response;
@@ -143,13 +145,6 @@ export async function setPersistentFlag(virtualMachineId: number, persistent: st
 {
   const bodyData = { virtualMachineId, persistent };
   const response = await callDbTwig('dbos/setPersistent', bodyData);
-  return response;
-}
-
-export async function setSaveXmlDescriptionFlag(virtualMachineId: number, saveXmlDescription: string)
-{
-  const bodyData = { virtualMachineId, saveXmlDescription };
-  const response = await callDbTwig('dbos/setSaveXmlDescription', bodyData);
   return response;
 }
 

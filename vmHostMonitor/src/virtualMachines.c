@@ -23,7 +23,7 @@
 #include "logger.h"
 #include "vmHosts.h"
 
-char *machineName, *vDiskFilename, *sparseDiskAllocation, *vCdromFilename, *osVariant, *networkSource,
+char *machineName, *vDiskFilename, *sparseAllocation, *vCdromFilename, *osVariant, *networkSource,
   *networkDevice, *bootDevice, commandLine[2048], *metaDataFilename, *userDataFilename, *netDataFilename, *persistent;
 
 int vCpus = 0, vMemory = 0, vDiskSize = 0, rc = E_SUCCESS;
@@ -53,11 +53,11 @@ int stopVirtualMachine(void)
     free(xmlDesc);
   }
 
-  virDomainDestroy(vm);
-  virDomainFree(vm);
-
   snprintf(text2Log, sizeof(text2Log)-1, "Stopping virtual machine: %s", machineName);
   logOutput(LOG_OUTPUT_VERBOSE, text2Log);
+
+  virDomainShutdownFlags(vm, VIR_DOMAIN_SHUTDOWN_DEFAULT);
+  virDomainFree(vm);
 
   return rc;
 }
@@ -184,9 +184,9 @@ int createVirtualMachine(void)
 {
   char text2Log[LOGMSG_LENGTH];
   char vDiskOptions[VDISK_OPTIONS_LENGTH];
-  cJSON *item = NULL;
+  cJSON *item = NULL, *array = NULL, *entry = NULL;
   virDomain *virtualDomain = NULL;
-  int rc = E_SUCCESS;
+  int rc = E_SUCCESS, x = 0;
 
   item = cJSON_GetObjectItemCaseSensitive(messagePayload, "machineName");
   if (!item) return jsonError("machineName");
@@ -197,14 +197,14 @@ int createVirtualMachine(void)
   vDiskFilename = item->valuestring;
 
   vDiskSize = 0;
-  item = cJSON_GetObjectItemCaseSensitive(messagePayload, "vDiskSize");
+  item = cJSON_GetObjectItemCaseSensitive(messagePayload, "diskSize");
   if (item) vDiskSize = item->valueint;
 
-  item = cJSON_GetObjectItemCaseSensitive(messagePayload, "sparseDiskAllocation");
-  if (item) sparseDiskAllocation = item->valuestring;
+  item = cJSON_GetObjectItemCaseSensitive(messagePayload, "sparseAllocation");
+  if (item) sparseAllocation = item->valuestring;
 
   bzero(vDiskOptions, sizeof(vDiskOptions));
-  if (vDiskSize) snprintf(vDiskOptions, sizeof(vDiskOptions)-1, ",size=%d,sparse=%s", vDiskSize, 'Y' == *sparseDiskAllocation ? "true" : "false");
+  if (vDiskSize) snprintf(vDiskOptions, sizeof(vDiskOptions)-1, ",size=%d,sparse=%s", vDiskSize, 'Y' == *sparseAllocation ? "true" : "false");
 
   vCdromFilename = NULL;
   item = cJSON_GetObjectItemCaseSensitive(messagePayload, "vCdromFilename");
@@ -238,12 +238,41 @@ int createVirtualMachine(void)
   if (!item) return jsonError("persistent");
   persistent = item->valuestring;
 
+  bzero(commandLine, sizeof(commandLine));
+
   if (!vCdromFilename)
-    snprintf(commandLine, sizeof(commandLine), "%s --name %s --memory %d --vcpus %d --boot %s --disk %s --os-variant %s --virt-type kvm --network %s=%s,model=virtio --import --noautoconsole --connect qemu:///system 2>&1",
+    snprintf(commandLine, sizeof(commandLine)-1, "%s --name %s --memory %d --vcpus %d --boot %s --disk %s --os-variant %s --virt-type kvm --network %s=%s,model=virtio --import --noautoconsole --connect qemu:///system ",
       VIRT_INSTALL, machineName, vMemory, vCpus, bootDevice, vDiskFilename, osVariant, networkSource, networkDevice);
   else
-    snprintf(commandLine, sizeof(commandLine), "%s --name %s --memory %d --vcpus %d --boot %s --disk %s%s --disk %s,device=cdrom --os-variant %s --virt-type kvm --network %s=%s,model=virtio --import --noautoconsole --connect qemu:///system 2>&1",
+    snprintf(commandLine, sizeof(commandLine)-1, "%s --name %s --memory %d --vcpus %d --boot %s --disk %s%s --disk %s,device=cdrom --os-variant %s --virt-type kvm --network %s=%s,model=virtio --import --noautoconsole --connect qemu:///system ",
       VIRT_INSTALL, machineName, vMemory, vCpus, bootDevice, vDiskFilename, vDiskOptions, vCdromFilename, osVariant, networkSource, networkDevice);
+
+  item = cJSON_GetObjectItemCaseSensitive(messagePayload, "attachedStorage");
+  if (!item) return jsonError("attachedStorage");
+  array = item;
+
+  for (x = 0; x < cJSON_GetArraySize(array); x++)
+  {
+    entry = cJSON_GetArrayItem(array, x);
+    if (!entry) return jsonError("Array item missing...");
+
+    item = cJSON_GetObjectItemCaseSensitive(entry, "diskSize");
+    if (!item) return jsonError("diskSize");
+    vDiskSize = item->valueint;
+
+    item = cJSON_GetObjectItemCaseSensitive(entry, "sparseAllocation");
+    if (!item) return jsonError("sparseAllocation");
+    sparseAllocation = item->valuestring;
+
+    item = cJSON_GetObjectItemCaseSensitive(entry, "vDiskFilename");
+    if (!item) return jsonError("vDiskFilename");
+
+    bzero(vDiskOptions, sizeof(vDiskOptions));
+    snprintf(vDiskOptions, sizeof(vDiskOptions)-1, ",size=%d,sparse=%s", vDiskSize, 'Y' == *sparseAllocation ? "true" : "false");
+    snprintf(commandLine+strlen(commandLine), sizeof(commandLine) - strlen(commandLine), " --disk %s%s", item->valuestring, vDiskOptions);
+  }
+
+  snprintf(commandLine+strlen(commandLine), sizeof(commandLine) - strlen(commandLine), " 2>&1");
 
   logOutput(LOG_OUTPUT_VERBOSE, commandLine);
 
@@ -265,7 +294,24 @@ int createVirtualMachine(void)
   if (!virtualMachineIsRunning(machineName))
   {
     updateLifecycleState(machineName, "crashed", "install failed");
-    return E_SUCCESS;
+    return E_PLUGIN_ERROR;
+  }
+
+  if (vCdromFilename)
+  {
+    snprintf(commandLine, sizeof(commandLine), "%s detach-disk %s sda --config", VIRT_SHELL, machineName);
+    logOutput(LOG_OUTPUT_VERBOSE, commandLine);
+
+    process = popen(commandLine, "r");
+    if (!process)
+    {
+      snprintf(text2Log, sizeof(text2Log), "Unable to remove cdrom drive: %s", strerror(errno));
+      logOutput(LOG_OUTPUT_ERROR, text2Log);
+    }
+
+    while (fgets(text2Log, sizeof(text2Log), process)) logOutput(LOG_OUTPUT_VERBOSE, text2Log);
+
+    pclose(process);
   }
 
   if ('N' == *persistent)
@@ -279,3 +325,4 @@ int createVirtualMachine(void)
 
   return E_SUCCESS;
 }
+
