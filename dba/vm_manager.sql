@@ -65,6 +65,11 @@ as
   )
   return vault_objects.object_id%type; */
 
+  procedure clear_lazy_ref_bit
+  (
+    p_object_id                       vault_objects.object_id%type
+  );
+
   procedure create_dbos_service;
 
   procedure create_seed_from_virtual_disk

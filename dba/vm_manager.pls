@@ -405,6 +405,35 @@ package body vm_manager as
 ---
 ---
 
+  procedure clear_lazy_ref_bit
+  (
+    p_object_id                       vault_objects.object_id%type
+  )
+  is
+
+    l_lazy_ref_byte                   raw(1);
+    l_vm_image                        blob;
+    l_amount                          pls_integer := 1;
+
+  begin
+
+    l_vm_image := dgbunker_service.get_blob_locator(p_object_id, 'N');
+
+    dbms_lob.read(l_vm_image, l_amount, 80, l_lazy_ref_byte);
+
+    dgbunker_service.release_blob_locator(p_object_id, 'N');
+
+    if 0 != l_lazy_ref_byte then
+
+      l_vm_image := dgbunker_service.get_blob_locator(p_object_id, 'Y');
+      l_lazy_ref_byte := hextoraw('0');
+      dgbunker_service.write_to_blob(l_vm_image, l_amount, 80, l_lazy_ref_byte);
+      dgbunker_service.release_blob_locator(p_object_id, 'Y');
+
+    end if;
+
+  end clear_lazy_ref_bit;
+
   function get_cpu_count
   (
     p_host_capabilities               vm_hosts.host_capabilities%type
@@ -1753,7 +1782,7 @@ package body vm_manager as
 
       for i in 0 .. l_disks.get_size - 1 loop
 
-        dgbunker_service.invalidate_obscure_filename(l_disks.get_string(i));
+--        dgbunker_service.invalidate_obscure_filename(l_disks.get_string(i));
 
         l_json_parameters.put('storagePool', dgbunker_service.extract_group_key(l_disks.get_string(i)));
         l_dbos_message := dbos$message_t(dbms_session.unique_session_id, p_host_name, vm_manager.DELETE_STORAGE_POOL_MESSAGE,

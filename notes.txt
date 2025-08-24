@@ -240,3 +240,8 @@ Run /git/asterionDB/database-os/admin/oci-cleanup-image.sh
 Potential Issues
 ------------------------------------------------
 ora-01555 (rollback segment old) & ora-22924 (rollback segment old) may cause a VM to get crapped.
+
+To Recover A Bunged Up VDisk
+------------------------------------------------
+qemu-img convert -f qcow2 file-name.qcow2 -O raw file-name.raw
+qemu-img convert -f raw file-name.raw -O qcow2 file-name.qcow2
