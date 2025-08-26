@@ -394,6 +394,7 @@ int registerVmHost(char *sysInfo, char *hostCapabilities, unsigned long hypervis
   char *osRelease, char *machineType)
 {
 cJSON *jsonParms = NULL, *item = NULL;
+char *jsonString = NULL;
 int rc = E_SUCCESS;
 
   jsonParms = cJSON_CreateObject();
@@ -420,19 +421,22 @@ int rc = E_SUCCESS;
   item = cJSON_AddStringToObject(jsonParms, "machineType", machineType);
   if (!item) return E_JSON_ERROR;
 
-  rc = cJSON_PrintPreallocated(jsonParms, jsonParametersStr, sizeof(jsonParametersStr), 0);
-  if (!rc)
+  jsonString = cJSON_PrintUnformatted(jsonParms);
+  if (!jsonString)
   {
     rc = E_MALLOC;
     goto exit_point;
   }
+
   rc = OCIBindByName(dbConnStmt, &jsonParmsBV, dbSess.oraError,
-    (const OraText *)":jsonParameters", -1, jsonParametersStr, (ub4) strlen(jsonParametersStr)+1,
+    (const OraText *)":jsonParameters", -1, jsonString, (ub4) strlen(jsonString)+1,
     SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0, (ub4 *) 0, (sb4) OCI_DEFAULT);
 
   rc = OCIStmtExecute(dbSess.oraSvcCtx, dbConnStmt, dbSess.oraError, 1, 0, NULL, NULL,
     OCI_COMMIT_ON_SUCCESS);
   if (rc && OCI_SUCCESS_WITH_INFO != rc && OCI_NO_DATA != rc) rc = errorHandler(rc, dbSess.oraError);
+
+  if (jsonString) free(jsonString);
 
 exit_point:
 
@@ -732,7 +736,7 @@ retry:
   {
     errorHandler(rc, qSess.oraError);
 
-    if (OCI_QUEUE_TIMEOUT == oraErrorCode) goto retry;
+    if (OCI_QUEUE_TIMEOUT == oraErrorCode || OCI_PACKAGE_STATE_DISCARDED == oraErrorCode) goto retry;
 
     if (OCI_EOF_COM_CHAN == oraErrorCode || OCI_LOST_CONTACT == oraErrorCode || OCI_NOT_CONNECTED == oraErrorCode)
     {
@@ -873,9 +877,16 @@ int rc = E_SUCCESS, newJsonResultStrLength = xmlDescriptionLength + 256;
     (const OraText *)":jsonParameters", -1, jsonParametersStr, (ub4) strlen(jsonParametersStr)+1,
     SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0, (ub4 *) 0, (sb4) OCI_DEFAULT);
 
+retry:
+
   rc = OCIStmtExecute(dbSess.oraSvcCtx, dbConnStmt, dbSess.oraError, 1, 0, NULL, NULL,
     OCI_COMMIT_ON_SUCCESS);
-  if (rc && OCI_SUCCESS_WITH_INFO != rc && OCI_NO_DATA != rc) rc = errorHandler(rc, dbSess.oraError);
+
+  if (rc && OCI_SUCCESS_WITH_INFO != rc && OCI_NO_DATA != rc)
+  {
+    rc = errorHandler(rc, dbSess.oraError);
+    if (OCI_PACKAGE_STATE_DISCARDED == oraErrorCode) goto retry;
+  }
 
   pthread_mutex_unlock(&dbConnMtx);
 

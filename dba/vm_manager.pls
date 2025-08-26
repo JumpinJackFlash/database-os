@@ -1782,12 +1782,12 @@ package body vm_manager as
 
       for i in 0 .. l_disks.get_size - 1 loop
 
---        dgbunker_service.invalidate_obscure_filename(l_disks.get_string(i));
-
-        l_json_parameters.put('storagePool', dgbunker_service.extract_group_key(l_disks.get_string(i)));
+/*        l_json_parameters.put('storagePool', dgbunker_service.extract_group_key(l_disks.get_string(i)));
         l_dbos_message := dbos$message_t(dbms_session.unique_session_id, p_host_name, vm_manager.DELETE_STORAGE_POOL_MESSAGE,
           l_json_parameters.to_string);
-        send_message_to_host_monitor(l_dbos_message);
+        send_message_to_host_monitor(l_dbos_message); */
+
+        dgbunker_service.invalidate_obscure_filename(l_disks.get_string(i));
 
       end loop;
 

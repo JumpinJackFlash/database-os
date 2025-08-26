@@ -34,6 +34,7 @@
 #define USEC_TO_SEC_FACTOR                      .000001
 
 #define OCI_ERROR_ORA_NOOBJ                     4043
+#define OCI_PACKAGE_STATE_DISCARDED             4068
 #define OCI_ERROR_NO_TABVIEW                    942
 #define OCI_INVALID_ORA_OBJ                     24372
 #define OCI_EOF_COM_CHAN                        3113
