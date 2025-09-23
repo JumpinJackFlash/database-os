@@ -23,7 +23,6 @@ async function callDbTwig(apiCall: string, body?: object)
   let requestOptions = {};
   
   if (undefined !== body)
-
     requestOptions = 
     {
       method: 'POST',
@@ -38,7 +37,7 @@ async function callDbTwig(apiCall: string, body?: object)
     };
 
   const httpResponse = await fetch(process.env.DB_TWIG_URL + '/' + apiCall, requestOptions);
-  const jsonData = await httpResponse.json();
+  const jsonData = 200 === httpResponse.status ? await httpResponse.json() : null;
   const response =
   {
     jsonData: jsonData,
