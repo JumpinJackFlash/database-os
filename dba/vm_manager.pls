@@ -20,6 +20,37 @@ package body vm_manager as
   ROOT_USER                           constant varchar2(9) := 'root:root';
   QEMU_USER                           constant varchar2(9) := 'qemu:qemu';
 
+  function is_virtual_disk_in_use
+  (
+    p_virtual_machine_id              virtual_machines.virtual_machine_id%type,
+    p_virtual_disk_id                 virtual_disks.virtual_disk_id%type
+  )
+  return varchar2
+
+  is
+
+    l_virtual_disk_is_in_use          varchar2(1) := 'N';
+
+  begin
+
+    select  'Y'
+      into  l_virtual_disk_is_in_use
+      from  attached_storage a, virtual_machines m
+     where  a.virtual_disk_id = p_virtual_disk_id
+       and  m.virtual_machine_id != p_virtual_machine_id
+       and  a.virtual_machine_id = m.virtual_machine_id
+       and  lifecycle_state not in ('create', 'blocked', 'stopped', 'crashed');
+
+    return l_virtual_disk_is_in_use;
+
+  exception
+
+  when no_data_found then
+
+    return l_virtual_disk_is_in_use;
+
+  end is_virtual_disk_in_use;
+
   procedure create_virtual_machine_action
   (
     p_session_id                      varchar2,
@@ -82,6 +113,8 @@ package body vm_manager as
     end if;
 
     select  json_arrayagg(json_object(
+              'virtualDiskId'           is d.virtual_disk_id,
+              'diskName'                is disk_name,
               'objectId'                is object_id,
               'diskSize'                is disk_size,
               'sparseAllocation'        is sparse_allocation))
@@ -97,6 +130,13 @@ package body vm_manager as
       for x in 0 .. l_attached_storage.get_size - 1 loop
 
         l_entry := treat(l_attached_storage.get(x) as json_object_t);
+
+        if 'Y' = is_virtual_disk_in_use(p_virtual_machine_id, l_entry.get_number('virtualDiskId')) then
+
+          raise_application_error(vm_manager.VIRTUAL_DISK_IS_IN_USE, VIRTUAL_DISK_IS_IN_USE_EMSG||l_entry.get_string('diskName'));
+
+        end if;
+
         l_json_response := json_object_t(dgbunker_service.generate_object_filename(p_object_id => l_entry.get_string('objectId'),
           p_gateway_name => l_host_name, p_access_mode => dgbunker_service.READ_WRITE_ACCESS,
           p_linux_file_mode => VDISK_FILE_MODE, p_linux_subdir_mode => SUBDIR_FILE_MODE, p_disable_stream_write => 'Y',
@@ -132,6 +172,9 @@ package body vm_manager as
     l_json_parameters.put('attachedStorage', l_attached_storage);
 
     l_dbos_message := dbos$message_t(dbms_session.unique_session_id, l_host_name, vm_manager.CREATE_VM_MESSAGE, l_json_parameters.to_string);
+
+    commit;     -- This is needed to make the filenames we generated visible.
+
     send_message_to_host_monitor(l_dbos_message);
 
   end create_virtual_machine_action;
@@ -1385,6 +1428,59 @@ package body vm_manager as
 
   end get_virtual_machine_description;
 
+  function get_attached_storage
+  (
+    p_virtual_disk_id                 attached_storage.virtual_disk_id%type
+  )
+  return clob
+
+  is
+
+    l_result                          clob;
+
+  begin
+
+    select  nvl(json_arrayagg(json_object(
+                        'virtualMachineId'        is a.virtual_machine_id,
+                        'diskNumber'              is disk_number,
+                        'machineName'             is machine_name) order by machine_name), '[]')
+      into  l_result
+      from  attached_storage a, virtual_machines m
+     where  a.virtual_disk_id = p_virtual_disk_id
+       and  a.virtual_machine_id = m.virtual_machine_id;
+
+    return l_result;
+
+  end get_attached_storage;
+
+  function get_virtual_disks return clob
+
+  is
+
+    l_result                          clob;
+    l_rows                            pls_integer;
+
+  begin
+
+    select  count(*), json_object('virtualDisks' is json_arrayagg(
+                        json_object('virtualDiskId' is virtual_disk_id,
+                                    'diskName'      is disk_name,
+                                    'diskSize'      is disk_size,
+                                    'sparseAllocation' is sparse_allocation,
+                                    'attachedStorage' is get_attached_storage(virtual_disk_id) format json) order by disk_name) returning clob)
+      into  l_rows, l_result
+      from  virtual_disks;
+
+      if 0 = l_rows then
+
+        return db_twig.empty_json_array('virtualDisks');
+
+      end if;
+
+      return l_result;
+
+  end get_virtual_disks;
+
   function get_virtual_machines return clob
 
   is
@@ -1670,12 +1766,18 @@ package body vm_manager as
 
     for attached_disks in
     (
-      select  disk_number, object_id
+      select  disk_number, object_id, d.virtual_disk_id, disk_name
         from  attached_storage s, virtual_disks d
        where  virtual_machine_id = p_virtual_machine_id
          and  s.virtual_disk_id = d.virtual_disk_id
     )
     loop
+
+      if 'Y' = is_virtual_disk_in_use(p_virtual_machine_id, attached_disks.virtual_disk_id) then
+
+        raise_application_error(vm_manager.VIRTUAL_DISK_IS_IN_USE, VIRTUAL_DISK_IS_IN_USE_EMSG||attached_disks.disk_name);
+
+      end if;
 
       l_json_response := json_object_t(dgbunker_service.generate_object_filename(p_object_id => attached_disks.object_id,
         p_gateway_name => l_host_name, p_access_mode => dgbunker_service.READ_WRITE_ACCESS,
@@ -1696,6 +1798,8 @@ package body vm_manager as
     l_json_parameters.put('machineName', l_virtual_machine.machine_name);
     l_json_parameters.put('xmlDescriptionLength', dbms_lob.getlength(l_xml_description.getclobval));
     l_json_parameters.put('persistent', l_virtual_machine.persistent);
+
+    commit;     -- Need to commit here in order for the new filenames (in the xml description) to get committed to the DB.
 
     l_dbos_message := dbos$message_t(dbms_session.unique_session_id, l_host_name, vm_manager.START_VM_MESSAGE, l_json_parameters.to_string);
     send_message_to_host_monitor(l_dbos_message);

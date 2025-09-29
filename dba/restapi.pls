@@ -164,6 +164,20 @@ package body restapi as
 
   end get_service_data;
 
+  function get_virtual_disks
+  (
+    p_json_parameters                 json_object_t
+  )
+  return clob
+
+  is
+
+  begin
+
+    return vm_manager.get_virtual_disks;
+
+  end;
+
   function get_virtual_machines
   (
     p_json_parameters                 json_object_t

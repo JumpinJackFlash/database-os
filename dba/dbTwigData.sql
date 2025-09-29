@@ -5,6 +5,7 @@ insert into middle_tier_map values ('getIsoSeedImages', 'function', 'restapi.get
 insert into middle_tier_map values ('getOsVariants', 'function', 'restapi.get_os_variants', 'dbos', 'user', 'N');
 insert into middle_tier_map values ('getQcow2SeedImages', 'function', 'restapi.get_qcow2_seed_images', 'dbos', 'user', 'N');
 insert into middle_tier_map values ('getServiceData', 'function', 'restapi.get_service_data', 'dbos', 'none', 'Y');
+insert into middle_tier_map values ('getVirtualDisks', 'function', 'restapi.get_virtual_disks', 'dbos', 'user', 'N');
 insert into middle_tier_map values ('getVirtualMachines', 'function', 'restapi.get_virtual_machines', 'dbos', 'user', 'N');
 insert into middle_tier_map values ('getVmHosts', 'function', 'restapi.get_vm_hosts', 'dbos', 'user', 'N');
 insert into middle_tier_map values ('setPersistent', 'procedure', 'restapi.set_persistent', 'dbos', 'user', 'N');

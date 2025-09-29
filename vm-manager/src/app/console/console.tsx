@@ -7,10 +7,11 @@ import { getVirtualMachines, terminateUserSession } from "@/utils/serverFunction
 import { Button, Divider } from "@heroui/react";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
-import { OsVariantsT, SeedImagesT, VirtualMachinesT, VmHostsT } from "@/utils/dataTypes";
+import { OsVariantsT, SeedImagesT, VirtualMachinesT, VmHostsT, VirtualDiskT, VirtualDisksT } from "@/utils/dataTypes";
 import {Spinner} from "@heroui/spinner";
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure} from "@heroui/modal";
 import { VmManagerContext } from "@/utils/vmManagerContext";
+import VirtualDisks from './virtualDisks';
 
 interface ConsolePropsI 
 {
@@ -19,9 +20,10 @@ interface ConsolePropsI
   qcow2Images: SeedImagesT;
   vmImages: VirtualMachinesT;
   vmHosts: VmHostsT;
+  virtualDisks: VirtualDisksT;
 };
 
-export default function Console({ osVariants, isoImages, qcow2Images, vmImages, vmHosts }: ConsolePropsI) 
+export default function Console({ osVariants, isoImages, qcow2Images, vmImages, vmHosts, virtualDisks }: ConsolePropsI) 
 {
   const [ virtualMachines, setVirtualMachines ] = useState(vmImages);
 
@@ -121,6 +123,7 @@ export default function Console({ osVariants, isoImages, qcow2Images, vmImages, 
             <Button color="success" onPress={onCreateVmModalOpen}>New VM</Button>
           </div>
           <Divider className="m-4 max-w-screen-md" />
+          <VirtualDisks virtualDisks={virtualDisks} />
           <div>
             <Button color="primary" type="button" onPress={logout}>Log Out...</Button>
           </div>
