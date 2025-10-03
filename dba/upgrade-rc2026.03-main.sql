@@ -24,6 +24,13 @@ whenever sqlerror continue
 
 REM  Put stuff between here.....
 
+alter table virtual_machines drop constraint state_detail_chk;
+
+alter table virtual_machines add constraint state_detail_chk check (state_detail in ('unknown', 'shutdown finished', 'guest initiated', 'host initiated', 
+      'normal shutdown', 'host poweroff', 'guest crashed', 'migrated', 'saved', 'host failed', 'snapshot loaded', 'normal startup', 
+      'incoming migration', 'restored state', 'restored snapshot', 'wakeup event', 'normal resume', 'migration complete', 
+      'snapshot complete', 'migration running', 'migration failed', 'startup requested', 'install failed', 'startup failed'));
+
 REM  ...and here
 
 @loadPackages
