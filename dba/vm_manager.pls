@@ -636,7 +636,7 @@ package body vm_manager as
     l_keyword_and_value.put('keywordValue', VM_SEED_IMAGE);
     l_keywords_and_values.append(l_keyword_and_value);
 
-    return dgbunker_service.get_vault_objects(p_session_id => p_session_id, p_view_type => dgbunker_service.OVT_CATALOGED,
+    return dgbunker_service.get_objects(p_session_id => p_session_id, p_view_type => dgbunker_service.OVT_CATALOGED,
       p_selected_keywords_and_values => l_keywords_and_values, p_object_type_ids => l_object_type_ids,
       p_columns_to_return => l_columns_to_return);
 
@@ -1493,7 +1493,7 @@ package body vm_manager as
     select  count(*), json_object('virtualMachines' is json_arrayagg(
                         json_object(
                           'virtualMachineId'  is virtual_machine_id,
-                          'creationTimestamp'   is db_twig.convert_timestamp_to_unix_timestamp(creation_timestamp),
+                          'creationTimestamp'   is db_twig.to_unix_timestamp(creation_timestamp),
                           'machineName'         is machine_name,
                           'status'              is lifecycle_state,
                           'statusDetail'        is state_detail,
@@ -1533,7 +1533,7 @@ package body vm_manager as
               'hostId'            is host_id,
               'hostName'          is host_name,
               'status'            is status,
-              'lastUpdate'        is db_twig.convert_timestamp_to_unix_timestamp(last_update),
+              'lastUpdate'        is db_twig.to_unix_timestamp(last_update),
               'installedMemory'   is get_installed_memory(host_capabilities),
               'cpuCount'          is get_cpu_count(host_capabilities),
               'hypervisorVersion' is hypervisor_version,
