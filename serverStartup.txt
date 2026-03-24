@@ -1,0 +1,13 @@
+Main (jjflash) server startup
+----------------------------
+Login as asterion
+cd asterion/oracle/bin
+./startVMHostMonitor.sh
+cd ../database-os/vm-manager/
+./startFrontEnd.sh
+Bring up the front-end at http://jjflash.asteriondb.local:3000
+Log in
+Start VM's.
+Log into jjflash-eval as asterion
+cd asterion/oracle/dbTwig/examples/react
+./startServer.sh
