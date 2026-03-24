@@ -37,10 +37,10 @@ async function callDbTwig(apiCall: string, body?: object)
     };
 
   const httpResponse = await fetch(process.env.DB_TWIG_URL + '/' + apiCall, requestOptions);
-  const jsonData = 200 === httpResponse.status ? await httpResponse.json() : null;
+//  const jsonData = 200 === httpResponse.status ? await httpResponse.json() : null;
   const response =
   {
-    jsonData: jsonData,
+    jsonData: await httpResponse.json(),
     ok: httpResponse.ok,
     httpStatus: httpResponse.status
   }
@@ -125,6 +125,12 @@ export async function getServiceData()
     process.env.JWT_SIGNING_KEY = response.jsonData.jwtSigningKey;
     process.env.JWT_EXPIRES_IN = response.jsonData.jwtExpiresIn;
   }
+  return response;
+}
+
+export async function getVirtualDisks()
+{
+  const response = await callDbTwig('dbos/getVirtualDisks')
   return response;
 }
 
