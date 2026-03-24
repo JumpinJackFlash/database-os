@@ -29,6 +29,9 @@ as
   VM_HOST_OFFLINE                     constant pls_integer := -20202;
   VM_HOST_OFFLINE_EMSG                constant varchar2(62) := 'Assigned host server for specified virtual machine is offline.';
 
+  VIRTUAL_DISK_IS_IN_USE              constant pls_integer := -20203;
+  VIRTUAL_DISK_IS_IN_USE_EMSG         constant varchar2(34) := 'Assigned virtual disk is in use: ';
+
 /*  function create_cloud_init_cdrom_image
   (
     p_session_id                      varchar2,
@@ -157,6 +160,12 @@ as
     p_delete_boot_disk                boolean
   );
 
+  function get_attached_storage
+  (
+    p_virtual_disk_id                 attached_storage.virtual_disk_id%type
+  )
+  return clob;
+
   function get_cpu_count
   (
     p_host_capabilities               vm_hosts.host_capabilities%type
@@ -202,6 +211,8 @@ as
     p_json_parameters                 json_object_t
   )
   return clob;
+
+  function get_virtual_disks return clob;
 
   function get_virtual_machines return clob;
 

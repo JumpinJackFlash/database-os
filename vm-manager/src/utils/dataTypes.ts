@@ -87,3 +87,16 @@ export type VmHostsT =
 [
   vmHost: VmHostT
 ];
+
+export type VirtualDiskT =
+{
+  virtualDiskId: number,
+  diskName: string,
+  diskSize: number,
+  sparseAllocation: string
+}
+
+export type VirtualDisksT =
+[
+  virtualDisk: VirtualDiskT
+];

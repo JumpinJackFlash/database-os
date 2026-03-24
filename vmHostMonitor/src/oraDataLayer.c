@@ -673,6 +673,8 @@ cJSON *jsonParms = NULL, *item = NULL;
 
   logOutput(LOG_OUTPUT_ALWAYS, jsonParametersStr);
 
+  retry:
+
   pthread_mutex_lock(&dbConnMtx);
 
   rc = OCIBindByName(dbConnStmt, &jsonParmsBV, dbSess.oraError,
@@ -683,6 +685,8 @@ cJSON *jsonParms = NULL, *item = NULL;
     OCI_COMMIT_ON_SUCCESS);
 
   pthread_mutex_unlock(&dbConnMtx);
+
+  if (OCI_PACKAGE_STATE_DISCARDED == rc) goto retry;
 
   exit_point:
 

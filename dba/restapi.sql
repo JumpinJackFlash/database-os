@@ -40,6 +40,12 @@ package restapi as
   )
   return clob;
 
+  function get_virtual_disks
+  (
+    p_json_parameters                 json_object_t
+  )
+  return clob;
+
   function get_virtual_machines
   (
     p_json_parameters                 json_object_t
