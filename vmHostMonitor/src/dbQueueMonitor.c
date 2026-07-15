@@ -88,7 +88,7 @@ int rc = E_SUCCESS, cancelType = 0;
 
   rc = monitorQueue();
 
-  if (rc && E_STOP_QUEUE_THREAD != rc) logOutput(LOG_OUTPUT_ERROR, getErrorText(rc));
+  if (rc && E_STOP_QUEUE_THREAD != rc) logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, getErrorText(rc));
 
   queueThreadStatus = rc;
 
@@ -103,8 +103,8 @@ int rc = E_SUCCESS;
   rc = pthread_create(&queueThreadID, NULL, queueThread, (void *) NULL);
   if (rc)
   {
-    logOutput(LOG_OUTPUT_ERROR, "Unable to start queue monitor thread.");
-    logOutput(LOG_OUTPUT_ERROR, strerror(errno));
+    logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, "Unable to start queue monitor thread.");
+    logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, strerror(errno));
     return E_FATAL_SERVER_ERROR;
   }
 

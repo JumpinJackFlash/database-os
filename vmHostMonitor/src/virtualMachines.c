@@ -54,7 +54,7 @@ int stopVirtualMachine(void)
   }
 
   snprintf(text2Log, sizeof(text2Log)-1, "Stopping virtual machine: %s", machineName);
-  logOutput(LOG_OUTPUT_VERBOSE, text2Log);
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_VERBOSE, text2Log);
 
   virDomainShutdownFlags(vm, VIR_DOMAIN_SHUTDOWN_DEFAULT);
   virDomainFree(vm);
@@ -79,7 +79,7 @@ int undefineVirtualMachine(void)
   virDomainFree(vm);
 
   snprintf(text2Log, sizeof(text2Log)-1, "Undefined virtual machine: %s", machineName);
-  logOutput(LOG_OUTPUT_VERBOSE, text2Log);
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_VERBOSE, text2Log);
 
   return E_SUCCESS;
 }
@@ -112,17 +112,17 @@ int createCloudInitCdrom(void)
     snprintf(commandLine, sizeof(commandLine), "genisoimage -output %s -volid cidata -joliet -rock --graft-points user-data=%s meta-data=%s network-config=%s",
       vCdromFilename, userDataFilename, metaDataFilename, netDataFilename);
 
-  logOutput(LOG_OUTPUT_VERBOSE, commandLine);
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_VERBOSE, commandLine);
 
   process = popen(commandLine, "r");
   if (!process)
   {
     snprintf(text2Log, sizeof(text2Log), "Unable to create cloud-init CDROM: %s", strerror(errno));
-    logOutput(LOG_OUTPUT_ERROR, text2Log);
+    logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, text2Log);
     return E_CHILD_DIED;    // Should be using a better error code...
   }
 
-  while (fgets(text2Log, sizeof(text2Log), process)) logOutput(LOG_OUTPUT_VERBOSE, text2Log);
+  while (fgets(text2Log, sizeof(text2Log), process)) logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_VERBOSE, text2Log);
 
   pclose(process);
 
@@ -156,7 +156,7 @@ int startVirtualMachine(void)
   if (rc) return rc;
 
   snprintf(text2Log, sizeof(text2Log)-1, "Starting virtual machine: %s", machineName);
-  logOutput(LOG_OUTPUT_VERBOSE, text2Log);
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_VERBOSE, text2Log);
 
   if ('N' == *persistent)
   {
@@ -274,7 +274,7 @@ int createVirtualMachine(void)
 
   snprintf(commandLine+strlen(commandLine), sizeof(commandLine) - strlen(commandLine), " 2>&1");
 
-  logOutput(LOG_OUTPUT_VERBOSE, commandLine);
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_VERBOSE, commandLine);
 
   updateLifecycleState(machineName, "starting", "startup requested");
 
@@ -282,12 +282,12 @@ int createVirtualMachine(void)
   if (!process)
   {
     snprintf(text2Log, sizeof(text2Log), "Unable to start VM: %s", strerror(errno));
-    logOutput(LOG_OUTPUT_ERROR, text2Log);
+    logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, text2Log);
     updateLifecycleState(machineName, "crashed", "startup failed");
     return E_PLUGIN_ERROR;
   }
 
-  while (fgets(text2Log, sizeof(text2Log), process)) logOutput(LOG_OUTPUT_VERBOSE, text2Log);
+  while (fgets(text2Log, sizeof(text2Log), process)) logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_VERBOSE, text2Log);
 
   pclose(process);
 
@@ -300,16 +300,16 @@ int createVirtualMachine(void)
   if (vCdromFilename)
   {
     snprintf(commandLine, sizeof(commandLine), "%s detach-disk %s sda --config", VIRT_SHELL, machineName);
-    logOutput(LOG_OUTPUT_VERBOSE, commandLine);
+    logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_VERBOSE, commandLine);
 
     process = popen(commandLine, "r");
     if (!process)
     {
       snprintf(text2Log, sizeof(text2Log), "Unable to remove cdrom drive: %s", strerror(errno));
-      logOutput(LOG_OUTPUT_ERROR, text2Log);
+      logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, text2Log);
     }
 
-    while (fgets(text2Log, sizeof(text2Log), process)) logOutput(LOG_OUTPUT_VERBOSE, text2Log);
+    while (fgets(text2Log, sizeof(text2Log), process)) logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_VERBOSE, text2Log);
 
     pclose(process);
   }

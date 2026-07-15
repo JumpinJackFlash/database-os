@@ -1,7 +1,7 @@
 'use client'
 
 import { formatTimestamp } from "@/utils/clientFunctions";
-import { deleteVirtualMachine, setPersistentFlag } from "@/utils/serverFunctions";
+import { deleteVirtualMachine, updateVm } from "@/utils/serverFunctions";
 import { Checkbox,  Button } from "@heroui/react";
 import React, { useState, useContext } from "react";
 import { VirtualMachineT, RefreshVirtualMachineListT } from "@/utils/dataTypes";
@@ -27,6 +27,8 @@ export default function VirtualMachines({ virtualMachine, refreshVirtualMachineL
   const [ deleteVmConfirmed, setDeleteVmConfirmed ] = useState(false);
   const [ deleteBootDiskConfirmed, setDeleteBootDiskConfirmed ] = useState(false);
   const [ persistentVM, setPersistentVM ] = useState('Y' === virtualMachine.persistent ? true : false);
+  const [ startOnSystemBoot, setStartOnSystemBoot ] = useState('Y' === virtualMachine.startOnSystemBoot);
+  const [ updateVmDisabled, setUpdateVmDisabled ] = useState(true);
 
   const vmManagerContext = useContext(VmManagerContext);
 
@@ -47,12 +49,13 @@ export default function VirtualMachines({ virtualMachine, refreshVirtualMachineL
   const inputDisabled = virtualMachine?.status === 'stopped' || virtualMachine?.status === 'crashed'  ? false : true;
   const deleteDisabledText = virtualMachine?.status !== 'stopped' ? 'Running instance must be stopped first.' : '';
 
-  function setPersistence(setting: boolean)
+  function updateVmDetails()
   {
-    setPersistentVM(setting);
-    setPersistentFlag(virtualMachine.virtualMachineId, setting ? 'Y' : 'N').then((response) =>
+    updateVm(virtualMachine.virtualMachineId, persistentVM ? 'Y' : 'N', startOnSystemBoot ? 'Y' : 'N', Number(vCpus), Number(vMemory) * 1024).then((response) =>
     {
       if (!response.ok) return vmManagerContext?.showErrorModal(response.jsonData.errorMessage);
+      setUpdateVmDisabled(true);
+      addToast({color: "primary", title: "VM Details Updated"});
     });
   }
 
@@ -76,12 +79,13 @@ export default function VirtualMachines({ virtualMachine, refreshVirtualMachineL
         <p>Network Device: {virtualMachine.networkDevice}</p>
         <p>Interfaces: {JSON.stringify(virtualMachine.interfaces)}</p>
       </div>
-      <div className="columns-1 flex gap-5">
-        <Checkbox title="Persistent VM's remain defined in the host's VM Manager Interface" isSelected={persistentVM} onValueChange={setPersistence} >Persistent VM</Checkbox>
+      <div className="columns-2 flex gap-5">
+        <Checkbox title="Persistent VM's remain defined in the host's VM Manager Interface" isSelected={persistentVM} onValueChange={(value) => {setPersistentVM(value); setUpdateVmDisabled(false)}} >Persistent VM</Checkbox>
+        <Checkbox title="Start this VM when the host boots up." isSelected={startOnSystemBoot} onValueChange={(value) => {setStartOnSystemBoot(value); setUpdateVmDisabled(false)}} >Start upon host boot</Checkbox>
       </div>
       <div className="columns-2 flex gap-5" title={immutableFieldsText}>
-        <Input disabled={inputDisabled} className="w-24" label="VCPU's" labelPlacement="outside" value={vCpus} onValueChange={setVCpus} type="number"  min={1}></Input>
-        <Input disabled={inputDisabled} className="w-24" label="VMemory" labelPlacement="outside" value={vMemory} onValueChange={setVMemory} type="number"  min={1}
+        <Input disabled={inputDisabled} className="w-24" label="VCPU's" labelPlacement="outside" value={vCpus} onValueChange={(value) => {setVCpus(value); setUpdateVmDisabled(false)}} type="number"  min={1}></Input>
+        <Input disabled={inputDisabled} className="w-24" label="VMemory" labelPlacement="outside" value={vMemory} onValueChange={(value) => {setVMemory(value);  setUpdateVmDisabled(false)}} type="number"  min={1}
           endContent=
           {
             <div className="pointer-events-none flex items-center">
@@ -98,6 +102,9 @@ export default function VirtualMachines({ virtualMachine, refreshVirtualMachineL
       </div>
       <div title={deleteDisabledText}>
         <Button color="danger" isDisabled={!deleteVmConfirmed} onPress={deleteVM}>Delete</Button>
+      </div>
+      <div title='Press this button to update the VM details.'>
+        <Button color="primary" isDisabled={updateVmDisabled} onPress={updateVmDetails}>Update</Button>
       </div>
     </ModalBody>
   );

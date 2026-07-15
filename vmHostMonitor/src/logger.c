@@ -83,16 +83,16 @@ char y;
   return;
 }
 
-static int logToScreenOnly(char *textToLog, int crlf)
+static int logToScreenOnly(const char *function, const int line, char *textToLog, int crlf)
 {
 char timeStampValue[TIMESTAMP_SIZE];
 
   timeStamp(timeStampValue, TIMESTAMP_SIZE);
 
   if (crlf)
-    printf("%s - %s\n", timeStampValue, textToLog);
+    printf("%s - %s(%d): %s\n", timeStampValue, function, line, textToLog);
   else
-    printf("%s - %s", timeStampValue, textToLog);
+    printf("%s - %s(%d): %s", timeStampValue, function, line, textToLog);
 
   return(E_SUCCESS);
 }
@@ -108,7 +108,7 @@ int rc = E_SUCCESS;
   return E_SUCCESS;
 }
 
-static void writeToLogFile(char *output, int crlf)
+static void writeToLogFile(const char *function, const int line, char *output, int crlf)
 {
 char timeStampValue[TIMESTAMP_SIZE];
 
@@ -117,28 +117,28 @@ char timeStampValue[TIMESTAMP_SIZE];
   if (logFile)
   {
     if (crlf)
-      fprintf(logFile, "%s - %s\n", timeStampValue, output);
+      fprintf(logFile, "%s - %s(%d): %s\n", timeStampValue, function, line, output);
     else
-      fprintf(logFile, "%s - %s", timeStampValue, output);
+      fprintf(logFile, "%s - %s(%d): %s", timeStampValue, function, line, output);
   }
 
   return;
 }
 
-void logOutput(int pLogLevel, char *textToLog)
+void logOutput(const char *function, const int line, int pLogLevel, char *textToLog)
 {
   if (pLogLevel > logLevel) return;
 
-  logToScreenOnly(textToLog, TRUE);
-  if (logOutputToFile) writeToLogFile(textToLog, TRUE);
+  logToScreenOnly(function, line, textToLog, TRUE);
+  if (logOutputToFile) writeToLogFile(function, line, textToLog, TRUE);
 }
 
-void logOutputNoCRLF(int pLogLevel, char *textToLog)
+void logOutputNoCRLF(const char *function, const int line, int pLogLevel, char *textToLog)
 {
   if (pLogLevel > logLevel) return;
 
-  logToScreenOnly(textToLog, FALSE);
-  if (logOutputToFile) writeToLogFile(textToLog, FALSE);
+  logToScreenOnly(function, line, textToLog, FALSE);
+  if (logOutputToFile) writeToLogFile(function, line, textToLog, FALSE);
 }
 
 static void getLocalTime(void *vLocalTime)
@@ -178,8 +178,8 @@ char textToLog[WORK_LENGTH];
   rc = createDirectory(logFileName);
   if (rc)
   {
-    logOutput(LOG_OUTPUT_ERROR, "Unable to create log file directory.");
-    logOutput(LOG_OUTPUT_ERROR, logFileName);
+    logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, "Unable to create log file directory.");
+    logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, logFileName);
     return osErrorHandler(rc);
   }
 
@@ -188,14 +188,14 @@ char textToLog[WORK_LENGTH];
   logFile = fopen(logFilePath, "wt");
   if (!logFile)
   {
-    logOutput(LOG_OUTPUT_ERROR, "Unable to open log file");
-    logOutput(LOG_OUTPUT_ERROR, logFilePath);
+    logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, "Unable to open log file");
+    logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, logFilePath);
     return osErrorHandler(E_LOG_FILE);
   }
 
   logOutputToFile = TRUE;
   snprintf(textToLog, sizeof(textToLog), "Opened log file: %s", logFilePath);
-  logToScreenOnly(textToLog, TRUE);
+  logToScreenOnly(__FUNCTION__, __LINE__, textToLog, TRUE);
 
   setvbuf(logFile, (char *) NULL, _IOLBF, 0);
 
@@ -221,16 +221,16 @@ void writePreambleToLogfile(char *programName, char *buildDate, char *buildTime)
 char textToLog[WORK_LENGTH];
 
   snprintf(textToLog, sizeof(textToLog), "%s - tag: %s - branch: %s", programName, GIT_TAG, GIT_BRANCH);
-  writeToLogFile(textToLog, TRUE);
+  writeToLogFile(__FUNCTION__, __LINE__, textToLog, TRUE);
   snprintf(textToLog, sizeof(textToLog), "Build Date/Time: %s / %s", buildDate, buildTime);
-  writeToLogFile(textToLog, TRUE);
+  writeToLogFile(__FUNCTION__, __LINE__, textToLog, TRUE);
 
-  writeToLogFile("Copyright (c) 2025 by AsterionDB Inc. All rights reserved.", TRUE);
-  writeToLogFile("The use of this software is governed by a software license", TRUE);
-  writeToLogFile("agreement contained within the Software Development Kit", TRUE);
-  writeToLogFile("distribution.  Consult that license document for further", TRUE);
-  writeToLogFile("information.  Your continued use of this software confirms", TRUE);
-  writeToLogFile("that you will abide by the terms of the license agreement.", TRUE);
+  writeToLogFile(__FUNCTION__, __LINE__, "Copyright (c) 2025 by AsterionDB Inc. All rights reserved.", TRUE);
+  writeToLogFile(__FUNCTION__, __LINE__, "The use of this software is governed by a software license", TRUE);
+  writeToLogFile(__FUNCTION__, __LINE__, "agreement contained within the Software Development Kit", TRUE);
+  writeToLogFile(__FUNCTION__, __LINE__, "distribution.  Consult that license document for further", TRUE);
+  writeToLogFile(__FUNCTION__, __LINE__, "information.  Your continued use of this software confirms", TRUE);
+  writeToLogFile(__FUNCTION__, __LINE__, "that you will abide by the terms of the license agreement.", TRUE);
 }
 
 void startupPreamble(char *programName, char *buildDate, char *buildTime)
@@ -238,16 +238,16 @@ void startupPreamble(char *programName, char *buildDate, char *buildTime)
 char textToLog[WORK_LENGTH];
 
   snprintf(textToLog, sizeof(textToLog), "%s - tag: %s - branch: %s", programName, GIT_TAG, GIT_BRANCH);
-  logOutput(LOG_OUTPUT_ALWAYS, textToLog);
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, textToLog);
   snprintf(textToLog, sizeof(textToLog), "Build Date/Time: %s / %s", buildDate, buildTime);
-  logOutput(LOG_OUTPUT_ALWAYS, textToLog);
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, textToLog);
 
-  logOutput(LOG_OUTPUT_ALWAYS, "Copyright (c) 2025 by AsterionDB Inc. All rights reserved.");
-  logOutput(LOG_OUTPUT_ALWAYS, "The use of this software is governed by a software license");
-  logOutput(LOG_OUTPUT_ALWAYS, "agreement contained within the Software Development Kit");
-  logOutput(LOG_OUTPUT_ALWAYS, "distribution.  Consult that license document for further");
-  logOutput(LOG_OUTPUT_ALWAYS, "information.  Your continued use of this software confirms");
-  logOutput(LOG_OUTPUT_ALWAYS, "that you will abide by the terms of the license agreement.");
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, "Copyright (c) 2025 by AsterionDB Inc. All rights reserved.");
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, "The use of this software is governed by a software license");
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, "agreement contained within the Software Development Kit");
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, "distribution.  Consult that license document for further");
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, "information.  Your continued use of this software confirms");
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, "that you will abide by the terms of the license agreement.");
 }
 
 void setLogLevel(int pLogLevel)

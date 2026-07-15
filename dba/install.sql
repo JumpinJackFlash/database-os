@@ -108,7 +108,7 @@ create or replace type dbos$message_t as object
 
 show errors type dbos$message_t
 
-@createQueue &dbos_user
+@createDbosQueue &dbos_user
 
 create sequence id_seq minvalue 1 maxvalue 999999999999 cycle;
 

@@ -27,7 +27,7 @@ static int keepRunning = TRUE;
 
 int vmHostErrorHandler(void)
 {
-  logOutput(LOG_OUTPUT_ERROR, (char *) virGetLastErrorMessage());
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, (char *) virGetLastErrorMessage());
   return E_LIBVIRT_ERROR;
 }
 
@@ -379,7 +379,7 @@ unsigned int dCount = 0;
 
 static void selfSignalCallback(int watch, int fd, int events, void * opaque)
 {
-  logOutput(LOG_OUTPUT_ALWAYS, "signal callback");
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, "signal callback");
   keepRunning = FALSE;
 }
 
@@ -420,7 +420,7 @@ struct utsname utsnameBuffer;
   if (!vmHostConnection)
   {
     vmError = virGetLastError();
-    logOutput(LOG_OUTPUT_ERROR, vmError->message);
+    logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, vmError->message);
   }
 
   vmHostSysinfo = virConnectGetSysinfo((virConnect *)vmHostConnection, 0);
@@ -547,24 +547,24 @@ const char *domainName = NULL;
 char *xmlDescription = NULL;
 
   domainName = virDomainGetName(domain);
-  logOutput(LOG_OUTPUT_ALWAYS, (char *) domainName);
-  logOutput(LOG_OUTPUT_ALWAYS, (char *) decodeEvent(event));
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, (char *) domainName);
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, (char *) decodeEvent(event));
 
   switch (event)
   {
     case VIR_DOMAIN_EVENT_RESUMED:
-      logOutput(LOG_OUTPUT_ALWAYS, decodeResumedDetail(detail));
+      logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, decodeResumedDetail(detail));
       updateLifecycleState((char *) domainName, "starting", decodeResumedDetail(detail));
       break;
 
     case VIR_DOMAIN_EVENT_STARTED:
-      logOutput(LOG_OUTPUT_ALWAYS, decodeStartupDetail(detail));
+      logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, decodeStartupDetail(detail));
       updateLifecycleState((char *) domainName, "running", decodeStartupDetail(detail));
       runningInstanceHandler(domain);
       break;
 
     case VIR_DOMAIN_EVENT_SHUTDOWN:
-      logOutput(LOG_OUTPUT_ALWAYS, decodeShutdownDetail(detail));
+      logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, decodeShutdownDetail(detail));
       if (VIR_DOMAIN_EVENT_SHUTDOWN_GUEST == detail)
       {
         xmlDescription = virDomainGetXMLDesc(domain, VIR_DOMAIN_XML_INACTIVE);
@@ -578,7 +578,7 @@ char *xmlDescription = NULL;
       break;
 
     case VIR_DOMAIN_EVENT_STOPPED:
-      logOutput(LOG_OUTPUT_ALWAYS, decodeStoppedDetail(detail));
+      logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, decodeStoppedDetail(detail));
       updateLifecycleState((char *) domainName, "stopped", decodeStoppedDetail(detail));
       break;
 

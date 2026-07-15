@@ -183,7 +183,7 @@ int rc = E_SUCCESS;
       return rc;
   }
 
-  logOutput(LOG_OUTPUT_ERROR, option);
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, option);
   return E_CONFIG_OPTION;
 }
 
@@ -192,7 +192,7 @@ static int parseConfigOptions(void)
 char *option = NULL, *value = NULL;
 int rc = E_SUCCESS;
 
-  logOutput(LOG_OUTPUT_INFO, "Processing configuration options.");
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_INFO, "Processing configuration options.");
 
   while (E_EOF != getNextConfigurationOption(&option, &value))
   {
@@ -254,7 +254,7 @@ static int startSystemdHeartbeat(void)
   systemdTimeout *= USEC_TO_SEC_FACTOR;
   systemdTimeout -= (int) (systemdTimeout * WAKE_UP_EARLY_PERCENT);
   sprintf(sText2Log, "Watchdog/Heartbeat Interval: %ld", systemdTimeout);
-  logOutput(LOG_OUTPUT_ALWAYS, sText2Log);
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, sText2Log);
 
   return pthread_create(&heartbeatThreadID, NULL, heartbeatThread, (void *)NULL);
 }
@@ -273,14 +273,14 @@ int rc = E_SUCCESS;
 
   if (daemonize)
   {
-    logOutput(LOG_OUTPUT_ALWAYS, "The VM Host Monitor is now running as a background process.");
+    logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, "The VM Host Monitor is now running as a background process.");
     rc = daemon(FALSE, FALSE);
     if (rc)
     {
       snprintf(text2Log, sizeof(text2Log), "daemon failed...%d - %s", rc, strerror(errno));
       snprintf(text2Log, sizeof(text2Log), "daemon failed...%d", rc);
-      logOutput(LOG_OUTPUT_ERROR, text2Log);
-      logOutput(LOG_OUTPUT_ERROR, strerror(errno));
+      logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, text2Log);
+      logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, strerror(errno));
     }
   }
 }
@@ -294,7 +294,7 @@ static int createPidFile(const char *programName)
 
   snprintf(pidFilename, sizeof(pidFilename), "%s/%s.pid", PID_FILE_PREFIX, programName);
   snprintf(text2Log, sizeof(text2Log), "Opening PID file: %s", pidFilename);
-  logOutput(LOG_OUTPUT_ALWAYS, text2Log);
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, text2Log);
 
   if (strchr(programName, '/'))
   {
@@ -304,7 +304,7 @@ static int createPidFile(const char *programName)
     rc = mkdir(pidDirectory, S_IRWXU);
     if (rc && EEXIST != errno)
     {
-      logOutput(LOG_OUTPUT_ERROR, strerror(errno));
+      logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, strerror(errno));
       return E_CREATE_PID_FILE;
     }
   }
@@ -312,7 +312,7 @@ static int createPidFile(const char *programName)
   pidFile = open(pidFilename, O_RDWR | O_CREAT | O_CLOEXEC, S_IRUSR | S_IWUSR);
   if (-1 == pidFile)
   {
-    logOutput(LOG_OUTPUT_ERROR, strerror(errno));
+    logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, strerror(errno));
     return E_CREATE_PID_FILE;
   }
 
@@ -381,7 +381,7 @@ int rc = E_SUCCESS;
   if (rc) goto exitPoint;
   writePreambleToLogfile(PROGRAM_NAME, __DATE__, __TIME__);
   snprintf(text2Log, sizeof(text2Log), "Opening configuration file: %s", configFilePath);
-  logOutput(LOG_OUTPUT_ALWAYS, text2Log);
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, text2Log);
 
   rc = createPidFile(PROGRAM_NAME);
   if (rc) goto exitPoint;
@@ -397,7 +397,7 @@ int rc = E_SUCCESS;
   if (rc) goto exitPoint;
 
   snprintf(text2Log, sizeof(text2Log), "%s is online...", PROGRAM_NAME);
-  logOutput(LOG_OUTPUT_ALWAYS, text2Log);
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, text2Log);
 
   rc = setupEventLoop();
 
@@ -412,7 +412,7 @@ int rc = E_SUCCESS;
 
 exitPoint:
 
-  if (rc) logOutput(LOG_OUTPUT_ERROR, getErrorText(rc));
+  if (rc) logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, getErrorText(rc));
 
   terminateSystemdHeartbeat();
 
@@ -422,7 +422,7 @@ exitPoint:
   disconnectFromDatabase();
 
   snprintf(text2Log, sizeof(text2Log), "%s shutdown complete...", PROGRAM_NAME);
-  logOutput(LOG_OUTPUT_ALWAYS, text2Log);
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, text2Log);
 
   closeLogFile();
 
@@ -431,9 +431,9 @@ exitPoint:
 #ifdef MEMORY_COUNT
   if (checkMemoryCount())
   {
-    logOutput(LOG_OUTPUT_ERROR, "Memory leak...");
+    logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, "Memory leak...");
     sprintf(text2Log, "Allocated: %ld - Freed: %ld", getMallocCount(), getFreeCount());
-    logOutput(LOG_OUTPUT_ERROR, text2Log);
+    logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, text2Log);
   }
 #endif
 
