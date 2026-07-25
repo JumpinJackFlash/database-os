@@ -162,10 +162,10 @@ int getSessionFromSPool(OCI_CONNECTION *cObj, OCI_SESSION *sObj)
 sword rc = OCI_SUCCESS;
 
   rc = OCIHandleAlloc(cObj->oraEnv, (void *)&sObj->oraError, OCI_HTYPE_ERROR, 0, (dvoid **)0);
-  if (rc) return oraErrorHandler(rc, NULL);
+  if (rc) return E_MALLOC;
 
   rc = OCIHandleAlloc(cObj->oraEnv, (void *)&sObj->authInfo, OCI_HTYPE_AUTHINFO, 0, (dvoid **)0);
-  if (rc) return oraErrorHandler(rc, NULL);
+  if (rc) return E_MALLOC;
 
   rc = OCISessionGet(cObj->oraEnv, sObj->oraError, &sObj->oraSvcCtx, sObj->authInfo, cObj->poolName,
       cObj->poolNameLength, 0, 0, 0, 0, 0, OCI_SESSGET_SPOOL);
@@ -194,8 +194,7 @@ OCIError *oraError = NULL;
   rc = OCIServerAttach(cObj->oraServer, oraError, (OraText *)cObj->database, (sb4)strlen(cObj->database), OCI_DEFAULT);
   if (rc)
   {
-    logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, "Unable to attach to the server...");
-//    oraErrorHandler(rc, oraError);
+    logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, "Unable to attach to the server. Check environment variable settings.");
     rc = errorHandler(__FUNCTION__, __LINE__, rc, oraError);
     OCIHandleFree(oraError, OCI_HTYPE_ERROR);
     return rc;
