@@ -5,8 +5,8 @@
  *      Author: gilly
  */
 
-#ifndef VMHOSTS_H_
-#define VMHOSTS_H_
+#ifndef VMHOST_H_
+#define VMHOST_H_
 
 extern void *vmHostConnection;
 
@@ -19,4 +19,4 @@ void *getVirtualDomain(char *machineName);
 int vmHostErrorHandler(void);
 int deleteStoragePool(void);
 
-#endif /* VMHOSTS_H_ */
+#endif /* VMHOST_H_ */

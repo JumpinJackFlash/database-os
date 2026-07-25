@@ -1103,6 +1103,7 @@ package body vm_manager as
     l_variant                         os_variants.variant%type;
     l_virtual_disk_id                 virtual_disks.virtual_disk_id%type;
     l_object_id                       vault_objects.object_id%type;
+    l_api_user_id                     virtual_machines.api_user_id%type;
     l_result                          json_object_t;
 
   begin
@@ -1121,12 +1122,15 @@ package body vm_manager as
     l_result := json_object_t(create_virtual_disk(p_session_id, p_machine_name||'.qcow2'));
     l_object_id := l_result.get_string('objectId');
 
+    l_result := json_object_t(dgbunker_service.get_user_profile(icam.get_session_user_id(p_session_id)));
+    l_api_user_id := l_result.get_string('apiUserId');
+
     insert into virtual_machines
       (virtual_machine_id, machine_name, boot_disk_id, vcpu_count, virtual_memory, os_variant,
-       network_source, network_device, host_id, lifecycle_state)
+       network_source, network_device, host_id, lifecycle_state, api_user_id)
     values
       (id_seq.nextval, p_machine_name, l_object_id, p_vcpu_count, p_virtual_memory * 1024,
-       l_variant, l_network_source, p_network_device, p_host_id, 'create')
+       l_variant, l_network_source, p_network_device, p_host_id, 'create', l_api_user_id)
     returning virtual_machine_id into l_virtual_machine_id;
 
     create_attached_storage(p_session_id, l_virtual_machine_id, p_attached_storage);
@@ -1162,6 +1166,7 @@ package body vm_manager as
     l_vdisk_id                        vault_objects.object_id%type;
     l_variant                         os_variants.variant%type;
     l_host_name                       vm_hosts.host_name%type;
+    l_api_user_id                     virtual_machines.api_user_id%type;
     l_status                          vm_hosts.status%type;
 
   begin
@@ -1191,12 +1196,15 @@ package body vm_manager as
     l_cdrom_id := create_cloud_init_cdrom_image(p_session_id, p_machine_name, l_host_name, p_meta_data, p_user_data, p_network_config);
     l_vdisk_id := create_virtual_disk_from_seed(p_session_id, p_machine_name||'.qcow2', p_seed_image_id);
 
+    l_result := json_object_t(dgbunker_service.get_user_profile(icam.get_session_user_id(p_session_id)));
+    l_api_user_id := l_result.get_string('apiUserId');
+
     insert into virtual_machines
       (virtual_machine_id, machine_name, boot_disk_id, vcpu_count, virtual_memory, os_variant,
-       network_source, network_device, host_id, lifecycle_state)
+       network_source, network_device, host_id, lifecycle_state, api_user_id)
     values
       (id_seq.nextval, p_machine_name, l_vdisk_id, p_vcpu_count, p_virtual_memory * 1024,
-       l_variant, l_network_source, p_network_device, p_host_id, 'create')
+       l_variant, l_network_source, p_network_device, p_host_id, 'create', l_api_user_id)
     returning virtual_machine_id into l_virtual_machine_id;
 
     create_attached_storage(p_session_id, l_virtual_machine_id, p_attached_storage);
@@ -1238,6 +1246,7 @@ package body vm_manager as
     l_vdisk_id                        vault_objects.object_id%type;
     l_variant                         os_variants.variant%type;
     l_host_name                       vm_hosts.host_name%type;
+    l_api_user_id                     virtual_machines.api_user_id%type;
     l_status                          vm_hosts.status%type;
 
   begin
@@ -1268,12 +1277,15 @@ package body vm_manager as
       p_ip4_address, p_ip4_gateway, p_ip4_netmask, p_nameservers, p_dns_search);
     l_vdisk_id := create_virtual_disk_from_seed(p_session_id, p_machine_name||'.qcow2', p_seed_image_id);
 
+    l_result := json_object_t(dgbunker_service.get_user_profile(icam.get_session_user_id(p_session_id)));
+    l_api_user_id := l_result.get_string('apiUserId');
+
     insert into virtual_machines
       (virtual_machine_id, machine_name, boot_disk_id, vcpu_count, virtual_memory, os_variant,
-       network_source, network_device, host_id, lifecycle_state)
+       network_source, network_device, host_id, lifecycle_state, api_user_id)
     values
       (id_seq.nextval, p_machine_name, l_vdisk_id, p_vcpu_count, p_virtual_memory * 1024,
-       l_variant, l_network_source, p_network_device, p_host_id, 'create')
+       l_variant, l_network_source, p_network_device, p_host_id, 'create', l_api_user_id)
     returning virtual_machine_id into l_virtual_machine_id;
 
     create_attached_storage(p_session_id, l_virtual_machine_id, p_attached_storage);
@@ -1506,6 +1518,7 @@ package body vm_manager as
                           'uuid'                is uuid,
                           'interfaces'          is interfaces,
                           'persistent'          is persistent,
+                          'startOnHostBoot'     is start_on_host_boot,
                           'host'                is vm_manager.get_vm_host_name(host_id)) order by machine_name returning clob) returning clob)
       into  l_rows, l_result
       from  virtual_machines;
@@ -1656,43 +1669,16 @@ package body vm_manager as
             machine_type = l_machine_type
      where  host_name = p_host_name;
 
-  end register_vm_host;
-
-  procedure set_persistent
-  (
-    p_virtual_machine_id              virtual_machines.virtual_machine_id%type,
-    p_persistent                      virtual_machines.persistent%type
-  )
-
-  is
-
-    l_dbos_message                    dbos$message_t;
-    l_host_name                       vm_hosts.host_name%type;
-    l_machine_name                    virtual_machines.machine_name%type;
-    l_lifecycle_state                 virtual_machines.lifecycle_state%type;
-    l_json_parameters                 json_object_t := json_object_t;
-
-  begin
-
-    select  machine_name, host_name, lifecycle_state
-      into  l_machine_name, l_host_name, l_lifecycle_state
-      from  vm_hosts h, virtual_machines m
-     where  virtual_machine_id = p_virtual_machine_id
-       and  h.host_id = m.host_id;
-
     update  virtual_machines
-       set  persistent = p_persistent
-     where  virtual_machine_id = p_virtual_machine_id;
+       set  lifecycle_state = 'stopped',
+            state_detail = 'host poweroff'
+     where  host_id =
+            (select  host_id
+               from  vm_hosts
+              where  host_name = p_host_name)
+       and  lifecycle_state not in ('stopped', 'crashed', 'blocked');
 
-    if 'running' = l_lifecycle_state and 'N' = p_persistent then
-
-      l_json_parameters.put('machineName', l_machine_name);
-      l_dbos_message := dbos$message_t(dbms_session.unique_session_id, l_host_name, vm_manager.UNDEFINE_VM_MESSAGE, l_json_parameters.to_string);
-      send_message_to_host_monitor(l_dbos_message);
-
-    end if;
-
-  end set_persistent;
+  end register_vm_host;
 
   procedure set_vm_host_offline
   (
@@ -1710,10 +1696,30 @@ package body vm_manager as
 
   end set_vm_host_offline;
 
+  procedure set_vm_state
+  (
+    p_json_parameters                 json_object_t
+  )
+
+  is
+
+    l_machine_name                    virtual_machines.machine_name%type := db_twig.get_string(p_json_parameters, 'machineName');
+    l_lifecycle_state                 virtual_machines.lifecycle_state%type := db_twig.get_string(p_json_parameters, 'lifecycleState');
+
+  begin
+
+    update  virtual_machines
+       set  lifecycle_state = l_lifecycle_state,
+            state_detail = 'host initiated'
+    where   machine_name = l_machine_name;
+
+  end set_vm_state;
+
   procedure start_virtual_machine
   (
     p_session_id                      varchar2,
-    p_virtual_machine_id              virtual_machines.virtual_machine_id%type
+    p_virtual_machine_id              virtual_machines.virtual_machine_id%type,
+    p_api_user_id                     virtual_machines.api_user_id%type default null
   )
 
   is
@@ -1728,6 +1734,12 @@ package body vm_manager as
     l_xml_description                 virtual_machines.xml_description%type;
 
   begin
+
+    if p_api_user_id is not null and p_session_id is not null then
+
+      raise_application_error(db_twig.INVALID_PARAMETERS, db_twig.INVALID_PARAMETERS_EMSG||' - The p_session_id and p_api_user_id parameters can not both be set.');
+
+    end if;
 
     select  *
       into  l_virtual_machine
@@ -1760,7 +1772,7 @@ package body vm_manager as
       p_gateway_name => l_host_name, p_access_mode => dgbunker_service.READ_WRITE_ACCESS,
       p_linux_file_mode => VDISK_FILE_MODE, p_linux_subdir_mode => SUBDIR_FILE_MODE, p_disable_stream_write => 'Y',
       p_access_limit => dgbunker_service.unlimited_access_operations, p_valid_until => dgbunker_service.NO_EXPIRATION,
-      p_file_user_group => ROOT_USER, p_subdir_user_group => ROOT_USER, p_session_id => p_session_id));
+      p_file_user_group => ROOT_USER, p_subdir_user_group => ROOT_USER, p_session_id => p_session_id, p_api_user_id => p_api_user_id));
 
     l_xml_description := set_obscure_vdisk(l_virtual_machine.xml_description, 0, l_json_response.get_string('filename'));
 
@@ -1783,7 +1795,7 @@ package body vm_manager as
         p_gateway_name => l_host_name, p_access_mode => dgbunker_service.READ_WRITE_ACCESS,
         p_linux_file_mode => VDISK_FILE_MODE, p_linux_subdir_mode => SUBDIR_FILE_MODE, p_disable_stream_write => 'Y',
         p_access_limit => dgbunker_service.unlimited_access_operations, p_valid_until => dgbunker_service.NO_EXPIRATION,
-        p_file_user_group => ROOT_USER, p_subdir_user_group => ROOT_USER, p_session_id => p_session_id));
+        p_file_user_group => ROOT_USER, p_subdir_user_group => ROOT_USER, p_session_id => p_session_id, p_api_user_id => p_api_user_id));
 
       l_xml_description := set_obscure_vdisk(l_xml_description, attached_disks.disk_number, l_json_response.get_string('filename'));
 
@@ -1805,6 +1817,33 @@ package body vm_manager as
     send_message_to_host_monitor(l_dbos_message);
 
   end start_virtual_machine;
+
+  procedure start_virtual_machines_on_host_boot
+  (
+    p_host_name                       vm_hosts.host_name%type
+  )
+
+  is
+
+  begin
+
+    for start_on_host_boot in
+    (
+      select  virtual_machine_id, api_user_id
+        from  virtual_machines m, vm_hosts h
+       where  host_name = p_host_name
+         and  h.host_id = m.host_id
+         and  start_on_host_boot = 'Y'
+         and  lifecycle_state in ('crashed', 'stopped')
+    )
+    loop
+
+      start_virtual_machine(p_session_id => null, p_virtual_machine_id => start_on_host_boot.virtual_machine_id,
+        p_api_user_id => start_on_host_boot.api_user_id);
+
+    end loop;
+
+  end start_virtual_machines_on_host_boot;
 
   procedure stop_virtual_machine
   (
@@ -1917,6 +1956,48 @@ package body vm_manager as
 
   end update_vm_description;
 
+  procedure update_vm_details
+  (
+    p_virtual_machine_id              virtual_machines.virtual_machine_id%type,
+    p_persistent                      virtual_machines.persistent%type,
+    p_start_on_host_boot              virtual_machines.start_on_host_boot%type,
+    p_vcpu_count                      virtual_machines.vcpu_count%type,
+    p_virtual_memory                  virtual_machines.virtual_memory%type
+  )
+
+  is
+
+    l_dbos_message                    dbos$message_t;
+    l_host_name                       vm_hosts.host_name%type;
+    l_machine_name                    virtual_machines.machine_name%type;
+    l_lifecycle_state                 virtual_machines.lifecycle_state%type;
+    l_json_parameters                 json_object_t := json_object_t;
+
+  begin
+
+    select  machine_name, host_name, lifecycle_state
+      into  l_machine_name, l_host_name, l_lifecycle_state
+      from  vm_hosts h, virtual_machines m
+     where  virtual_machine_id = p_virtual_machine_id
+       and  h.host_id = m.host_id;
+
+    update  virtual_machines
+       set  persistent = p_persistent,
+            start_on_host_boot = p_start_on_host_boot,
+            vcpu_count = p_vcpu_count,
+            virtual_memory = p_virtual_memory
+     where  virtual_machine_id = p_virtual_machine_id;
+
+    if 'running' = l_lifecycle_state and 'N' = p_persistent then
+
+      l_json_parameters.put('machineName', l_machine_name);
+      l_dbos_message := dbos$message_t(dbms_session.unique_session_id, l_host_name, vm_manager.UNDEFINE_VM_MESSAGE, l_json_parameters.to_string);
+      send_message_to_host_monitor(l_dbos_message);
+
+    end if;
+
+  end update_vm_details;
+
   procedure update_vm_info
   (
     p_json_parameters                 json_object_t
@@ -1939,24 +2020,6 @@ package body vm_manager as
     where   machine_name = l_machine_name;
 
   end update_vm_info;
-
-  procedure update_vm_state
-  (
-    p_json_parameters                 json_object_t
-  )
-
-  is
-
-    l_machine_name                    virtual_machines.machine_name%type := db_twig.get_string(p_json_parameters, 'machineName');
-    l_lifecycle_state                 virtual_machines.lifecycle_state%type := db_twig.get_string(p_json_parameters, 'lifecycleState');
-
-  begin
-
-    update  virtual_machines
-       set  lifecycle_state = l_lifecycle_state
-    where   machine_name = l_machine_name;
-
-  end update_vm_state;
 
   procedure validate_vm_state
   (

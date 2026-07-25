@@ -190,14 +190,18 @@ OCIError *oraError = NULL;
   rc = OCIHandleAlloc(cObj->oraEnv, (void *)&oraError, OCI_HTYPE_ERROR, 0, (dvoid **)0);
   if (rc) return oraErrorHandler(rc, NULL);
 
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_VERBOSE, "Attaching to the server...");
   rc = OCIServerAttach(cObj->oraServer, oraError, (OraText *)cObj->database, (sb4)strlen(cObj->database), OCI_DEFAULT);
   if (rc)
   {
-    oraErrorHandler(rc, oraError);
+    logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, "Unable to attach to the server...");
+//    oraErrorHandler(rc, oraError);
+    rc = errorHandler(__FUNCTION__, __LINE__, rc, oraError);
     OCIHandleFree(oraError, OCI_HTYPE_ERROR);
-    return E_OCI_ERROR;
+    return rc;
   }
 
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_VERBOSE, "Server attached...");
   if (oraError) rc = OCIHandleFree(oraError, OCI_HTYPE_ERROR);
   if (rc) return oraErrorHandler(rc, oraError);
 
@@ -220,6 +224,8 @@ static int createOracleSession(OCI_CONNECTION *cObj, OCI_SESSION *sObj)
 {
 sword rc = OCI_SUCCESS;
 
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_VERBOSE, "Creating Oracle Session...");
+
   rc = OCIHandleAlloc(cObj->oraEnv, (void*)&sObj->oraError, OCI_HTYPE_ERROR, 0, (dvoid **)0);
   if (rc) return oraErrorHandler(rc, NULL);
   rc = OCIHandleAlloc(cObj->oraEnv, (void*)&sObj->oraSvcCtx, OCI_HTYPE_SVCCTX, 0, (dvoid **)0);
@@ -238,6 +244,7 @@ sword rc = OCI_SUCCESS;
   rc = OCISessionBegin(sObj->oraSvcCtx, sObj->oraError, sObj->oraSession, OCI_CRED_RDBMS, OCI_DEFAULT);
   if (rc)
   {
+    logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, "Unable to create an Oracle Session...");
     oraErrorHandler(rc, sObj->oraError);
     if (OCI_SUCCESS_WITH_INFO != rc) return(E_OCI_ERROR);
   }
@@ -296,12 +303,12 @@ cJSON *jsonParms = NULL, *item = NULL;
   strncpy(dbConn.database, envDatabaseName ? envDatabaseName : configDatabaseName, sizeof(dbConn.database)-1);
   dbConn.database[sizeof(dbConn.database)-1] = '\0';
   rc = connectToOracleAction(&dbConn);
-  if (rc) return errorHandler(__FUNCTION__, __LINE__, rc, NULL);
+  if (rc) return rc;
 
   strncpy(qConn.database, envDatabaseName ? envDatabaseName : configDatabaseName, sizeof(qConn.database)-1);
   qConn.database[sizeof(qConn.database)-1] = '\0';
   rc = connectToOracleAction(&qConn);
-  if (rc) return errorHandler(__FUNCTION__, __LINE__, rc, NULL);
+  if (rc) return rc;
 
   strncpy(qSess.username, envUser ? envUser : configUser, sizeof(qSess.username)-1);
   qSess.username[sizeof(qSess.username)-1] = '\0';
@@ -635,7 +642,7 @@ cJSON *jsonParms = NULL, *item = NULL;
   return rc;
 }
 
-int updateVmState(const char *domainName, const char *stateText)
+int setVmState(const char *domainName, const char *stateText)
 {
 int rc = E_SUCCESS;
 cJSON *jsonParms = NULL, *item = NULL;
@@ -643,7 +650,7 @@ cJSON *jsonParms = NULL, *item = NULL;
   jsonParms = cJSON_CreateObject();
   if (!jsonParms) return E_JSON_ERROR;
 
-  item = cJSON_AddStringToObject(jsonParms, "entryPoint", "updateVmState");
+  item = cJSON_AddStringToObject(jsonParms, "entryPoint", "setVmState");
   if (!item)
   {
     rc = jsonError("entryPoint");
@@ -661,6 +668,54 @@ cJSON *jsonParms = NULL, *item = NULL;
   if (!item)
   {
     rc = jsonError("lifecycleState");
+    goto exit_point;
+  }
+
+  rc = cJSON_PrintPreallocated(jsonParms, jsonParametersStr, sizeof(jsonParametersStr), 0);
+  if (!rc)
+  {
+    rc = E_MALLOC;
+    goto exit_point;
+  }
+
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, jsonParametersStr);
+
+  retry:
+
+  pthread_mutex_lock(&dbConnMtx);
+
+  rc = OCIBindByName(dbConnStmt, &jsonParmsBV, dbSess.oraError,
+    (const OraText *)":jsonParameters", -1, jsonParametersStr, (ub4) strlen(jsonParametersStr)+1,
+    SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0, (ub4 *) 0, (sb4) OCI_DEFAULT);
+
+  rc = OCIStmtExecute(dbSess.oraSvcCtx, dbConnStmt, dbSess.oraError, 1, 0, NULL, NULL,
+    OCI_COMMIT_ON_SUCCESS);
+
+  pthread_mutex_unlock(&dbConnMtx);
+
+  if (OCI_PACKAGE_STATE_DISCARDED == rc) goto retry;
+
+  exit_point:
+
+  if (jsonParms) cJSON_Delete(jsonParms);
+
+  if (rc && OCI_SUCCESS_WITH_INFO != rc && OCI_NO_DATA != rc) return errorHandler(__FUNCTION__, __LINE__, rc, dbSess.oraError);
+
+  return rc;
+}
+
+int startVirtualMachinesOnHostBoot(void)
+{
+int rc = E_SUCCESS;
+cJSON *jsonParms = NULL, *item = NULL;
+
+  jsonParms = cJSON_CreateObject();
+  if (!jsonParms) return E_JSON_ERROR;
+
+  item = cJSON_AddStringToObject(jsonParms, "entryPoint", "startVirtualMachinesOnHostBoot");
+  if (!item)
+  {
+    rc = jsonError("entryPoint");
     goto exit_point;
   }
 

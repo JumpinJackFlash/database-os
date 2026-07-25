@@ -61,7 +61,7 @@ export type VirtualMachineT =
   host: string,
   interfaces: string,
   persistent: string,
-  startOnSystemBoot: string,
+  startOnHostBoot: string,
   uuid: string
 };
 

@@ -167,9 +167,9 @@ export async function terminateUserSession()
   return response;
 }
 
-export async function updateVm(virtualMachineId: number, persistent: string, startOnSystemBoot: string, vCpus: number, vMemory: number)
+export async function updateVm(virtualMachineId: number, persistent: string, startOnHostBoot: string, vCpus: number, vMemory: number)
 {
-  const bodyData = { virtualMachineId, persistent, startOnSystemBoot, vCpus, vMemory };
+  const bodyData = { virtualMachineId, persistent, startOnHostBoot, vCpus, vMemory };
   const response = await callDbTwig('dbos/updateVmDetails', bodyData);
   return response;
 }

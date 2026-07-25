@@ -19,8 +19,8 @@
 #include "errors.h"
 #include "oraDataLayer.h"
 #include "logger.h"
-#include "vmHosts.h"
 #include "virtualMachines.h"
+#include "vmHost.h"
 
 static pthread_t queueThreadID;
 static int queueThreadStatus = E_SUCCESS;

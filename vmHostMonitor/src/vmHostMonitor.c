@@ -27,10 +27,10 @@
 
 #include "vmHostMonitorDefs.h"
 #include "oraDataLayer.h"
-#include "vmHosts.h"
 #include "dbQueueMonitor.h"
 #include "errors.h"
 #include "logger.h"
+#include "vmHost.h"
 
 static char cmdLineConfigFile[PATH_MAX];
 static char configFilePath[PATH_MAX];
@@ -237,7 +237,11 @@ stillAlive:
   rc = sleep(systemdTimeout);
   if (rc) return NULL;
 
-  if (heartbeatTerminated) pthread_exit((void *) NULL);
+  if (heartbeatTerminated)
+  {
+    logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_INFO, "heartbeatThread exiting...");
+    pthread_exit((void *) NULL);
+  }
 
   goto stillAlive;
 
@@ -332,18 +336,7 @@ static int createPidFile(const char *programName)
 
   write(pidFile, pidX, strlen(pidX));
 
-  return E_SUCCESS;
-}
-
-int rewritePidFile(void)
-{
-  char pidX[MAX_PID_SIZE];
-
-  bzero(pidX, sizeof(pidX));
-  snprintf(pidX, sizeof(pidX), "%d", getpid());
-
-  lseek(pidFile, 0, SEEK_SET);
-  write(pidFile, pidX, strlen(pidX));
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, "success");
 
   return E_SUCCESS;
 }
@@ -370,6 +363,9 @@ int rc = E_SUCCESS;
     DIRECTORY_SEPARATOR, cmdLineConfigFile[0] ? cmdLineConfigFile : CONFIG_FILE);
   configFilePath[sizeof(configFilePath)-1] = '\0';
 
+  snprintf(text2Log, sizeof(text2Log), "Opening configuration file: %s", configFilePath);
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, text2Log);
+
   rc = processConfigFile();
   if (rc) goto exitPoint;
 
@@ -380,8 +376,6 @@ int rc = E_SUCCESS;
   rc = openLogFile(PROGRAM_NAME, homeDirectory);
   if (rc) goto exitPoint;
   writePreambleToLogfile(PROGRAM_NAME, __DATE__, __TIME__);
-  snprintf(text2Log, sizeof(text2Log), "Opening configuration file: %s", configFilePath);
-  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, text2Log);
 
   rc = createPidFile(PROGRAM_NAME);
   if (rc) goto exitPoint;
@@ -405,6 +399,9 @@ int rc = E_SUCCESS;
   if (rc) goto exitPoint;
 
   startQueueThread();
+
+  rc = startVirtualMachinesOnHostBoot();
+  if (rc) goto exitPoint;
 
   rc = monitorDomainEvents();
 

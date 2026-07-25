@@ -27,7 +27,7 @@ export default function VirtualMachines({ virtualMachine, refreshVirtualMachineL
   const [ deleteVmConfirmed, setDeleteVmConfirmed ] = useState(false);
   const [ deleteBootDiskConfirmed, setDeleteBootDiskConfirmed ] = useState(false);
   const [ persistentVM, setPersistentVM ] = useState('Y' === virtualMachine.persistent ? true : false);
-  const [ startOnSystemBoot, setStartOnSystemBoot ] = useState('Y' === virtualMachine.startOnSystemBoot);
+  const [ startOnHostBoot, setStartOnHostBoot ] = useState('Y' === virtualMachine.startOnHostBoot);
   const [ updateVmDisabled, setUpdateVmDisabled ] = useState(true);
 
   const vmManagerContext = useContext(VmManagerContext);
@@ -51,7 +51,7 @@ export default function VirtualMachines({ virtualMachine, refreshVirtualMachineL
 
   function updateVmDetails()
   {
-    updateVm(virtualMachine.virtualMachineId, persistentVM ? 'Y' : 'N', startOnSystemBoot ? 'Y' : 'N', Number(vCpus), Number(vMemory) * 1024).then((response) =>
+    updateVm(virtualMachine.virtualMachineId, persistentVM ? 'Y' : 'N', startOnHostBoot ? 'Y' : 'N', Number(vCpus), Number(vMemory) * 1024).then((response) =>
     {
       if (!response.ok) return vmManagerContext?.showErrorModal(response.jsonData.errorMessage);
       setUpdateVmDisabled(true);
@@ -81,7 +81,7 @@ export default function VirtualMachines({ virtualMachine, refreshVirtualMachineL
       </div>
       <div className="columns-2 flex gap-5">
         <Checkbox title="Persistent VM's remain defined in the host's VM Manager Interface" isSelected={persistentVM} onValueChange={(value) => {setPersistentVM(value); setUpdateVmDisabled(false)}} >Persistent VM</Checkbox>
-        <Checkbox title="Start this VM when the host boots up." isSelected={startOnSystemBoot} onValueChange={(value) => {setStartOnSystemBoot(value); setUpdateVmDisabled(false)}} >Start upon host boot</Checkbox>
+        <Checkbox title="Start this VM when the host boots up." isSelected={startOnHostBoot} onValueChange={(value) => {setStartOnHostBoot(value); setUpdateVmDisabled(false)}} >Start upon host boot</Checkbox>
       </div>
       <div className="columns-2 flex gap-5" title={immutableFieldsText}>
         <Input disabled={inputDisabled} className="w-24" label="VCPU's" labelPlacement="outside" value={vCpus} onValueChange={(value) => {setVCpus(value); setUpdateVmDisabled(false)}} type="number"  min={1}></Input>

@@ -21,7 +21,7 @@
 #include "oraDataLayer.h"
 #include "errors.h"
 #include "logger.h"
-#include "vmHosts.h"
+#include "vmHost.h"
 
 char *machineName, *vDiskFilename, *sparseAllocation, *vCdromFilename, *osVariant, *networkSource,
   *networkDevice, *bootDevice, commandLine[2048], *metaDataFilename, *userDataFilename, *netDataFilename, *persistent;

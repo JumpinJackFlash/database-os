@@ -8,7 +8,7 @@ define dba_user = '&1'
 define dba_password = '&2'
 define db_name = '&3'
 define dbos_user = '&4'
-define elog_user = '&5'
+define dgbunker_user = '&5'
 
 spool $HOME/asterion/oracle/database-os/dba/upgrade-rc2026.09-main.log
 
@@ -22,7 +22,11 @@ whenever sqlerror continue
 
 REM  Put stuff between here.....
 
-alter table virtual_machines add start_on_system_boot varchar2(1) default 'N' not null constraint start_on_chk check (start_on_system_boot in ('Y', 'N'));
+create or replace synonym &dbos_user..object_vault_users for &dgbunker_user..object_vault_users;
+grant references(api_user_id), read on &dgbunker_user..object_vault_users to &dbos_user;
+
+alter table virtual_machines add start_on_host_boot varchar2(1) default 'N' not null constraint start_on_chk check (start_on_host_boot in ('Y', 'N'));
+alter table virtual_machines add api_user_id varchar2(32) references object_vault_users(api_user_id);
 
 REM  ...and here
 

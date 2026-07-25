@@ -58,17 +58,17 @@ package restapi as
   )
   return clob;
 
-  procedure set_persistent
-  (
-    p_json_parameters                 json_object_t
-  );
-
   procedure start_virtual_machine
   (
     p_json_parameters                 json_object_t
   );
 
   procedure stop_virtual_machine
+  (
+    p_json_parameters                 json_object_t
+  );
+
+  procedure update_vm_details
   (
     p_json_parameters                 json_object_t
   );

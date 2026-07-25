@@ -126,7 +126,7 @@ static char *decodeStoppedDetail(int detail)
       return "normal shutdown";
 
     case VIR_DOMAIN_EVENT_STOPPED_DESTROYED:
-      return "host poweroff";
+      return "host initiated";
 
     case VIR_DOMAIN_EVENT_STOPPED_CRASHED:
       return "guest crashed";
@@ -352,7 +352,7 @@ int getDomainInfo(virDomain *domain, cJSON *jsonParms)
 
 static int getVirtualMachineList(void)
 {
-int rc = E_SUCCESS, x = 0, state = 0, reason = 0;
+int rc = E_SUCCESS, x = 0, state = 0, reason = 0, oraErrorCode = 0;
 virDomain **domains = NULL, *domain = NULL;
 unsigned int dCount = 0;
 
@@ -366,9 +366,12 @@ unsigned int dCount = 0;
 
     rc = virDomainGetState(domain, &state, &reason, 0);
 
-    rc = validateVmState(virDomainGetName(domain), decodeState(state));
+/*    rc = validateVmState(virDomainGetName(domain), decodeState(state));
 
-    if (rc && DBOS_INVALID_VM_STATE == getOraErrorCode()) rc = updateVmState(virDomainGetName(domain), decodeState(state));
+    oraErrorCode = getOraErrorCode();
+    if (rc && DBOS_INVALID_VM_STATE == getOraErrorCode()) rc = setVmState(virDomainGetName(domain), decodeState(state)); */
+
+    rc = setVmState(virDomainGetName(domain), decodeState(state));
 
     virDomainFree(domains[x]);
   }
@@ -383,19 +386,29 @@ static void selfSignalCallback(int watch, int fd, int events, void * opaque)
   keepRunning = FALSE;
 }
 
-static int setupSelfSignal(void)
+static void killHandler(int x)
+{
+  keepRunning = FALSE;
+}
+
+static int setupSignals(void)
 {
 sigset_t mask;
 int rc = E_SUCCESS;
-struct sigaction sigAction;
+
+  signal(SIGHUP, SIG_IGN);
+  signal(SIGINT, killHandler);
+  signal(SIGQUIT, killHandler);
+  signal(SIGTERM, killHandler);
+  signal(SIGABRT, killHandler);
+
+  // Catch the signals on the self-signal file-descriptor.
 
   sigemptyset(&mask);
   sigaddset(&mask, SIGTERM);
   sigaddset(&mask, SIGQUIT);
   sigaddset(&mask, SIGABRT);
-
-  sigAction.sa_handler = SIG_IGN;
-  rc = sigaction(SIGTERM, &sigAction, NULL);
+  sigaddset(&mask, SIGINT);
 
   selfSignalFD = signalfd(-1, &mask, 0);
   if (-1 == selfSignalFD) return E_OSERR;
@@ -429,7 +442,7 @@ struct utsname utsnameBuffer;
   rc = virConnectGetVersion((virConnect *)vmHostConnection, &hypervisorVersion);
   rc = virConnectGetLibVersion((virConnect *)vmHostConnection, &libvirtVersion);
 
-  setupSelfSignal();
+  setupSignals();
 
   rc = registerVmHost(vmHostSysinfo, vmHostCapabilities, hypervisorVersion, libvirtVersion,
     utsnameBuffer.release, utsnameBuffer.machine);

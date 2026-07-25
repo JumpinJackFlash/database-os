@@ -12,7 +12,7 @@ C_SRCS += \
 ../utils.c \
 ../virtualMachines.c \
 ../vmHostMonitor.c \
-../vmHosts.c 
+../vmHost.c 
 
 C_DEPS += \
 ./dbQueueMonitor.d \
@@ -23,7 +23,7 @@ C_DEPS += \
 ./utils.d \
 ./virtualMachines.d \
 ./vmHostMonitor.d \
-./vmHosts.d 
+./vmHost.d 
 
 OBJS += \
 ./dbQueueMonitor.o \
@@ -34,7 +34,7 @@ OBJS += \
 ./utils.o \
 ./virtualMachines.o \
 ./vmHostMonitor.o \
-./vmHosts.o 
+./vmHost.o 
 
 
 # Each subdirectory must supply rules for building sources it contributes
@@ -49,7 +49,7 @@ OBJS += \
 clean: clean--2e-
 
 clean--2e-:
-	-$(RM) ./dbQueueMonitor.d ./dbQueueMonitor.o ./errors.d ./errors.o ./logger.d ./logger.o ./memory.d ./memory.o ./oraDataLayer.d ./oraDataLayer.o ./utils.d ./utils.o ./virtualMachines.d ./virtualMachines.o ./vmHostMonitor.d ./vmHostMonitor.o ./vmHosts.d ./vmHosts.o
+	-$(RM) ./dbQueueMonitor.d ./dbQueueMonitor.o ./errors.d ./errors.o ./logger.d ./logger.o ./memory.d ./memory.o ./oraDataLayer.d ./oraDataLayer.o ./utils.d ./utils.o ./virtualMachines.d ./virtualMachines.o ./vmHostMonitor.d ./vmHostMonitor.o ./vmHost.d ./vmHost.o
 
 .PHONY: clean--2e-
 

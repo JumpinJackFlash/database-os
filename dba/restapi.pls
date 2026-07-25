@@ -206,22 +206,6 @@ package body restapi as
 
   end get_vm_hosts;
 
-  procedure set_persistent
-  (
-    p_json_parameters                 json_object_t
-  )
-
-  is
-
-    l_virtual_machine_id              virtual_machines.virtual_machine_id%type := db_twig.get_number(p_json_parameters, 'virtualMachineId');
-    l_persistent                      virtual_machines.persistent%type := db_twig.get_string(p_json_parameters, 'persistent');
-
-  begin
-
-    vm_manager.set_persistent(l_virtual_machine_id, l_persistent);
-
-  end set_persistent;
-
   procedure start_virtual_machine
   (
     p_json_parameters                 json_object_t
@@ -266,6 +250,25 @@ package body restapi as
     icam.validate_session(p_json_parameters, p_required_authorization_level, p_allow_blocked_session);
 
   end validate_session;
+
+  procedure update_vm_details
+  (
+    p_json_parameters                 json_object_t
+  )
+
+  is
+
+    l_virtual_machine_id              virtual_machines.virtual_machine_id%type := db_twig.get_number(p_json_parameters, 'virtualMachineId');
+    l_persistent                      virtual_machines.persistent%type := db_twig.get_string(p_json_parameters, 'persistent');
+    l_start_on_host_boot              virtual_machines.start_on_host_boot%type := db_twig.get_string(p_json_parameters, 'startOnHostBoot');
+    l_vcpu_count                      virtual_machines.vcpu_count%type := db_twig.get_number(p_json_parameters, 'vCpus');
+    l_virtual_memory                  virtual_machines.virtual_memory%type := db_twig.get_number(p_json_parameters, 'vMemory');
+
+  begin
+
+    vm_manager.update_vm_details(l_virtual_machine_id, l_persistent, l_start_on_host_boot, l_vcpu_count, l_virtual_memory);
+
+  end update_vm_details;
 
 end restapi;
 /

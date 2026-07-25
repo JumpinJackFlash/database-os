@@ -8,6 +8,6 @@ insert into middle_tier_map values ('getServiceData', 'function', 'restapi.get_s
 insert into middle_tier_map values ('getVirtualDisks', 'function', 'restapi.get_virtual_disks', 'dbos', 'user', 'N');
 insert into middle_tier_map values ('getVirtualMachines', 'function', 'restapi.get_virtual_machines', 'dbos', 'user', 'N');
 insert into middle_tier_map values ('getVmHosts', 'function', 'restapi.get_vm_hosts', 'dbos', 'user', 'N');
-insert into middle_tier_map values ('setPersistent', 'procedure', 'restapi.set_persistent', 'dbos', 'user', 'N');
 insert into middle_tier_map values ('startVirtualMachine', 'procedure', 'restapi.start_virtual_machine', 'dbos', 'user', 'N');
 insert into middle_tier_map values ('stopVirtualMachine', 'procedure', 'restapi.stop_virtual_machine', 'dbos', 'user', 'N');
+insert into middle_tier_map values ('updateVmDetails', 'procedure', 'restapi.update_vm_details', 'dbos', 'user', 'N');

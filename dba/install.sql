@@ -20,8 +20,8 @@ define elog_user = '&4'
 define icam_user = '&5'
 define dgbunker_user = '&6'
 define dbos_user = '&7'
-define runtime_user = 'dbos_runtime'
-define runtime_password = '#SecurityBySimplicity2020#'
+define runtime_user = '&8'
+define runtime_password = '&9'
 
 connect &dba_user@"&database_name";
 
@@ -72,6 +72,9 @@ grant execute on &dbtwig_user..db_twig to &dbos_user;
 
 create or replace synonym &dbos_user..vault_objects for &dgbunker_user..vault_objects;
 grant references(object_id), read on &dgbunker_user..vault_objects to &dbos_user;
+
+create or replace synonym &dbos_user..object_vault_users for &dgbunker_user..object_vault_users;
+grant references(api_user_id), read on &dgbunker_user..object_vault_users to &dbos_user;
 
 create or replace synonym &dbos_user..dgbunker_service for &dgbunker_user..dgbunker_service;
 grant execute on &dgbunker_user..dgbunker_service to &dbos_user;
@@ -154,7 +157,11 @@ create table virtual_machines
     constraint interfaces_chk check(interfaces is json),
   host_id                           number(7)
     references vm_hosts(host_id),
-  xml_description                   xmltype
+  xml_description                   xmltype,
+  api_user_id                       varchar2(32)
+    references object_vault_users(api_user_id),
+  start_on_host_boot                varchar2(1) default 'N' not null 
+    constraint start_on_chk check (start_on_host_boot in ('Y', 'N'))
 );
 
 create table os_variants
@@ -163,6 +170,8 @@ create table os_variants
   variant                           varchar2(30) unique not null,
   long_name                         varchar2(64) not null
 );
+
+@$HOME/asterion/oracle/database-os/dba/osVariantList.sql
 
 create table virtual_disks
 (

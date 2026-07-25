@@ -1,9 +1,5 @@
 #!/bin/bash
 
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-NC='\033[0m'
-
 DBA_USER=''
 DB_NAME=''
 DBTWIG_USER=''
@@ -35,8 +31,45 @@ read -p "Enter the name of the database user that owns the AsterionDB schema [as
 read -p "Enter the name of the database user that owns the AsterionDB DBOS schema [asteriondb_dbos]: " DBOS_USER
 [ "${DBOS_USER}" == '' ] && DBOS_USER="asteriondb_dbos"
 
-cd ../dba
+read -p "Enter the name of the DBOS runtime database user [dbos_runtime]: " DBOS_RUNTIME
+[ "${DBOS_RUNTIME}" == '' ] && DBOS_RUNTIME="dbos_runtime"
+
+read -p "Enter the password for the DBOS runtime database user [#SecurityBySimplicity2020#]: " DBOS_RUNTIME_PASSWORD
+[ "${DBOS_RUNTIME_PASSWORD}" == '' ] && DBOS_RUNTIME_PASSWORD="#SecurityBySimplicity2020#"
 
 set +e
-sqlplus /nolog @install $DBA_USER $DB_NAME $DBTWIG_USER $ELOG_USER $ICAM_USER $DGBUNKER_USER $DBOS_USER
 
+cd ../dba
+
+./createOsVariantList.sh
+
+sqlplus /nolog @install $DBA_USER $DB_NAME $DBTWIG_USER $ELOG_USER $ICAM_USER $DGBUNKER_USER $DBOS_USER $DBOS_RUNTIME $DBOS_RUNTIME_PASSWORD
+
+sudo cp ~/asterion/oracle/database-os/admin/vmHostMonitor.service /usr/lib/systemd/system/
+sudo mkdir -p /etc/systemd/system/vmHostMonitor.service.d
+
+if ! grep -q Service /etc/systemd/system/vmHostMonitor.service.d/override.conf; then
+cat <<EOF >/tmp/append.txt
+[Service]
+Environment="DATABASE_NAME=${DB_NAME}"
+EOF
+cat /tmp/append.txt | sudo tee -a /etc/systemd/system/vmHostMonitor.service.d/override.conf
+sudo chmod o+w /etc/sysconfig/asterion
+sudo cat <<EOF >> /etc/sysconfig/asterion
+DBOS_RUNTIME=${DBOS_RUNTIME}
+DBOS_RUNTIME_PASSWORD=${DBOS_RUNTIME_PASSWORD}
+EOF
+fi
+
+ln -s ~/asterion/oracle/database-os/bin/vmHostMonitor ~/asterion/oracle/bin/vmHostMonitor
+cp ~/asterion/oracle/database-os/config/vmHostMonitor.sample ~/asterion/oracle/config/vmHostMonitor.config
+
+if [ "$(/sbin/getenforce)" != 'Disabled' ]; then
+  echo -e "${GREEN}Configuring SELinux...${NC}"
+  [ -d ~/asterion/oracle/database-os/bin ] \
+    && chcon -Rt bin_t ~/asterion/oracle/database-os/bin
+fi
+
+sudo systemctl daemon-reload
+
+echo "AsterionDB Database OS Infrastructure installed"

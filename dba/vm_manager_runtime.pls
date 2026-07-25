@@ -127,6 +127,14 @@ package body vm_manager_runtime as
 
         vm_manager.set_vm_host_offline(p_host_name);
 
+      when 'setVmState' then
+
+        vm_manager.set_vm_state(l_json_parameters);
+
+      when 'startVirtualMachinesOnHostBoot' then
+
+        vm_manager.start_virtual_machines_on_host_boot(p_host_name);
+
       when 'updateLifecycleState' then
 
         vm_manager.update_lifecycle_state(p_host_name, l_json_parameters);
@@ -138,10 +146,6 @@ package body vm_manager_runtime as
       when 'updateVmInfo' then
 
         vm_manager.update_vm_info(l_json_parameters);
-
-      when 'updateVmState' then
-
-        vm_manager.update_vm_state(l_json_parameters);
 
       when 'validateVmState' then
 
