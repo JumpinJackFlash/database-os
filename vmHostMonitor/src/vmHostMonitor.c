@@ -22,7 +22,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <systemd/sd-daemon.h>
-
+#include <openssl/evp.h>
 #include <cjson/cJSON.h>
 
 #include "vmHostMonitorDefs.h"
@@ -59,6 +59,64 @@ char *envDatabaseName;
 char *envOracleHome;
 
 char hostName[HOST_NAME_MAX];
+
+#define EVP_BUFFER_SIZE 4096
+
+int computeSha256Hash(const char *filename)
+{
+FILE *file = NULL;
+EVP_MD_CTX *mdctx = NULL;
+unsigned char buffer[EVP_BUFFER_SIZE], hash[EVP_MAX_MD_SIZE];
+unsigned int hash_len;
+
+  file = fopen(filename, "rb");
+  if (!file)
+  {
+    perror("Unable to open file");
+    return -1;
+  }
+
+  // Initialize OpenSSL EVP Context for SHA-256
+  mdctx = EVP_MD_CTX_new();
+  if (mdctx == NULL)
+  {
+    fclose(file);
+    return -1;
+  }
+
+  if (EVP_DigestInit_ex(mdctx, EVP_sha256(), NULL) != 1)
+  {
+    EVP_MD_CTX_free(mdctx);
+    fclose(file);
+    return -1;
+  }
+
+  // Read file in chunks and stream into the hash context
+  size_t bytes_read;
+  while ((bytes_read = fread(buffer, 1, EVP_BUFFER_SIZE, file)) > 0)
+  {
+    if (EVP_DigestUpdate(mdctx, buffer, bytes_read) != 1)
+    {
+      EVP_MD_CTX_free(mdctx);
+      fclose(file);
+      return -1;
+    }
+  }
+
+  // Finalize the hash computation
+  if (EVP_DigestFinal_ex(mdctx, hash, &hash_len) != 1)
+  {
+    EVP_MD_CTX_free(mdctx);
+    fclose(file);
+    return -1;
+  }
+
+  // Clean up resources
+  EVP_MD_CTX_free(mdctx);
+  fclose(file);
+
+  return E_SUCCESS;
+}
 
 int openConfigFile(char *configFilePath)
 {
@@ -353,6 +411,8 @@ int rc = E_SUCCESS;
 
   startupPreamble(PROGRAM_NAME, __DATE__, __TIME__);
 
+  computeSha256Hash(argv[0]);
+
   rc = processCommandLine(argc, argv);
   if (rc) goto exitPoint;
 
@@ -387,7 +447,7 @@ int rc = E_SUCCESS;
 
   prctl(PR_SET_DUMPABLE, 1);
 
-  rc = connectToDatabase(hostName);
+  rc = connectToDatabase();
   if (rc) goto exitPoint;
 
   snprintf(text2Log, sizeof(text2Log), "%s is online...", PROGRAM_NAME);

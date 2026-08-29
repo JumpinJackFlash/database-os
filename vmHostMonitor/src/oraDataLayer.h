@@ -13,7 +13,7 @@ extern cJSON *messagePayload;
 extern cJSON *responsePayload;
 extern char *jsonResultStr;
 
-int connectToDatabase(char *hostName);
+int connectToDatabase(void);
 int disconnectFromDatabase(void);
 void closeStatementHandles(void);
 int registerVmHost(char *sysInfo, char *hostCapabilities, unsigned long hypervisorVersion, unsigned long libvirtVersion,

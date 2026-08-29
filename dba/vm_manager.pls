@@ -1632,7 +1632,6 @@ package body vm_manager as
 
   procedure register_vm_host
   (
-    p_host_name                       vm_hosts.host_name%type,
     p_json_parameters                 json_object_t
   )
 
@@ -1651,7 +1650,7 @@ package body vm_manager as
       (host_id, host_name, status, last_update, sysinfo, host_capabilities, hypervisor_version, libvirt_version,
        os_release, machine_type)
     values
-      (id_seq.nextval, p_host_name, 'online', systimestamp at time zone 'utc', xmltype(l_sysinfo), xmltype(l_host_capabilities),
+      (id_seq.nextval, sys_context('USERENV', 'HOST'), 'online', systimestamp at time zone 'utc', xmltype(l_sysinfo), xmltype(l_host_capabilities),
        l_hypervisor_version, l_libvirt_version, l_os_release, l_machine_type);
 
   exception
@@ -1667,7 +1666,7 @@ package body vm_manager as
             libvirt_version = l_libvirt_version,
             os_release = l_os_release,
             machine_type = l_machine_type
-     where  host_name = p_host_name;
+     where  host_name = sys_context('USERENV', 'HOST');
 
     update  virtual_machines
        set  lifecycle_state = 'stopped',
@@ -1675,15 +1674,12 @@ package body vm_manager as
      where  host_id =
             (select  host_id
                from  vm_hosts
-              where  host_name = p_host_name)
+              where  host_name = sys_context('USERENV', 'HOST'))
        and  lifecycle_state not in ('stopped', 'crashed', 'blocked');
 
   end register_vm_host;
 
   procedure set_vm_host_offline
-  (
-    p_host_name                       vm_hosts.host_name%type
-  )
 
   is
 
@@ -1692,7 +1688,7 @@ package body vm_manager as
     update  vm_hosts
        set  status = 'offline',
             last_update = systimestamp at time zone 'utc'
-     where  host_name = p_host_name;
+     where  host_name = sys_context('USERENV', 'HOST');
 
   end set_vm_host_offline;
 
@@ -1819,9 +1815,6 @@ package body vm_manager as
   end start_virtual_machine;
 
   procedure start_virtual_machines_on_host_boot
-  (
-    p_host_name                       vm_hosts.host_name%type
-  )
 
   is
 
@@ -1831,7 +1824,7 @@ package body vm_manager as
     (
       select  virtual_machine_id, api_user_id
         from  virtual_machines m, vm_hosts h
-       where  host_name = p_host_name
+       where  host_name = sys_context('USERENV', 'HOST')
          and  h.host_id = m.host_id
          and  start_on_host_boot = 'Y'
          and  lifecycle_state in ('crashed', 'stopped')
@@ -1890,7 +1883,6 @@ package body vm_manager as
 
   procedure update_lifecycle_state
   (
-    p_host_name                       vm_hosts.host_name%type,
     p_json_parameters                 json_object_t
   )
 
@@ -2023,7 +2015,6 @@ package body vm_manager as
 
   procedure validate_vm_state
   (
-    p_host_name                       vm_hosts.host_name%type,
     p_json_parameters                 json_object_t
   )
 
@@ -2032,13 +2023,20 @@ package body vm_manager as
     l_machine_name                    virtual_machines.machine_name%type := db_twig.get_string(p_json_parameters, 'machineName');
     l_lifecycle_state                 virtual_machines.lifecycle_state%type := db_twig.get_string(p_json_parameters, 'lifecycleState');
     l_virtual_machine                 virtual_machines%rowtype;
+    l_host_id                         vm_hosts.host_id%type;
 
   begin
+
+    select  host_id
+      into  l_host_id
+      from  vm_hosts
+     where  host_name = sys_context('USERENV', 'HOST');
 
     select  *
       into  l_virtual_machine
       from  virtual_machines
-     where  machine_name = l_machine_name;
+     where  machine_name = l_machine_name
+       and  host_id = l_host_id;
 
     if l_virtual_machine.lifecycle_state != l_lifecycle_state then
 
@@ -2050,7 +2048,7 @@ package body vm_manager as
 
   when no_data_found then
 
-    raise_application_error(vm_manager.UNAUTHORIZED_VM_DETECTED, vm_manager.UNAUTHORIZED_VM_DETECTED_EMSG||' - '||p_host_name||':'||l_machine_name);
+    raise_application_error(vm_manager.UNAUTHORIZED_VM_DETECTED, vm_manager.UNAUTHORIZED_VM_DETECTED_EMSG||' - '||sys_context('USERENV', 'HOST')||':'||l_machine_name);
 
   end validate_vm_state;
 

@@ -352,7 +352,7 @@ int getDomainInfo(virDomain *domain, cJSON *jsonParms)
 
 static int getVirtualMachineList(void)
 {
-int rc = E_SUCCESS, x = 0, state = 0, reason = 0, oraErrorCode = 0;
+int rc = E_SUCCESS, x = 0, state = 0, reason = 0;
 virDomain **domains = NULL, *domain = NULL;
 unsigned int dCount = 0;
 

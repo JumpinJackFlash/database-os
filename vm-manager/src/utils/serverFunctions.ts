@@ -36,6 +36,9 @@ async function callDbTwig(apiCall: string, body?: object)
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + bearerToken },
     };
 
+  // @ts-ignore
+  if (null === bearerToken) delete requestOptions.headers.Authorization;
+
   const httpResponse = await fetch(process.env.DB_TWIG_URL + '/' + apiCall, requestOptions);
 //  const jsonData = 200 === httpResponse.status ? await httpResponse.json() : null;
   const response =
@@ -88,6 +91,7 @@ export async function createUserSession(identification: string, password: string
   const bodyData = { identification, password };
   const response = await callDbTwig('icam/createUserSession', bodyData);
   console.log(response);
+  console.log(response.jsonData.errorMessage);
   if (response.ok) await createSessionCookie(response.jsonData.sessionId, response.jsonData.accountType);
   return response;
 }

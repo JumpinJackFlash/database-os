@@ -40,7 +40,7 @@ main-build: vmHostMonitor
 vmHostMonitor: $(OBJS) $(USER_OBJS) makefile $(OPTIONAL_TOOL_DEPS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: GCC C Linker'
-	gcc -L"$(GIT_HOME)/common/dbCommon/build" -L"$(GIT_HOME)/common/oraCommon/Debug" -L"$(ORACLE_HOME)/lib" -pthread -o "vmHostMonitor" $(OBJS) $(USER_OBJS) $(LIBS) -lclntsh -locci -lsystemd -lvirt -lcjson
+	gcc -L"$(GIT_HOME)/common/dbCommon/build" -L"$(GIT_HOME)/common/oraCommon/Debug" -L"$(ORACLE_HOME)/lib" -pthread -o "vmHostMonitor" $(OBJS) $(USER_OBJS) $(LIBS) -lclntsh -locci -lsystemd -lvirt -lcjson -lcrypto
 	@echo 'Finished building target: $@'
 	@echo ' '
 

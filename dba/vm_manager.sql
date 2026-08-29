@@ -237,7 +237,6 @@ as
 
   procedure register_vm_host
   (
-    p_host_name                       vm_hosts.host_name%type,
     p_json_parameters                 json_object_t
   );
 
@@ -246,10 +245,7 @@ as
     p_message                         dbos$message_t
   );
 
-  procedure set_vm_host_offline
-  (
-    p_host_name                       vm_hosts.host_name%type
-  );
+  procedure set_vm_host_offline;
 
   procedure set_vm_state
   (
@@ -263,10 +259,7 @@ as
     p_api_user_id                     virtual_machines.api_user_id%type default null
   );
 
-  procedure start_virtual_machines_on_host_boot
-  (
-    p_host_name                       vm_hosts.host_name%type
-  );
+  procedure start_virtual_machines_on_host_boot;
 
   procedure stop_virtual_machine
   (
@@ -275,7 +268,6 @@ as
 
   procedure update_lifecycle_state
   (
-    p_host_name                       vm_hosts.host_name%type,
     p_json_parameters                 json_object_t
   );
 
@@ -300,7 +292,6 @@ as
 
   procedure validate_vm_state
   (
-    p_host_name                       vm_hosts.host_name%type,
     p_json_parameters                 json_object_t
   );
 

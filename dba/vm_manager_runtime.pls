@@ -12,7 +12,6 @@ package body vm_manager_runtime as
 
   function get_message_for_host_monitor
   (
-    p_host_name                       vm_hosts.host_name%type,
     p_json_parameters                 json_object_t
   )
   return clob
@@ -40,7 +39,7 @@ package body vm_manager_runtime as
     l_dequeue_options.visibility := DBMS_AQ.IMMEDIATE;
     l_dequeue_options.delivery_mode := DBMS_AQ.BUFFERED;
     l_dequeue_options.deq_condition := 'upper(nvl(tab.user_data.host_name,'''||
-      p_host_name||''')) = upper('''||p_host_name||''') and tab.user_data.message_type != '||vm_manager.HOST_MONITOR_REPLY_MESSAGE;
+      sys_context('USERENV', 'HOST')||''')) = upper('''||sys_context('USERENV', 'HOST')||''') and tab.user_data.message_type != '||vm_manager.HOST_MONITOR_REPLY_MESSAGE;
 
     dbms_aq.dequeue(
       queue_name => l_schema_owner||'.'||vm_manager.MESSAGE_QUEUE,
@@ -61,13 +60,12 @@ package body vm_manager_runtime as
 
   procedure send_message_to_client
   (
-    p_host_name                       vm_hosts.host_name%type,
     p_json_parameters                 json_object_t
   )
 
   is
 
-    l_payload                         dbos$message_t := dbos$message_t(p_json_parameters.get_string('clientHandle'), p_host_name,
+    l_payload                         dbos$message_t := dbos$message_t(p_json_parameters.get_string('clientHandle'), sys_context('USERENV', 'HOST'),
       vm_manager.HOST_MONITOR_REPLY_MESSAGE, p_json_parameters.to_clob);
     l_enqueue_options                 DBMS_AQ.enqueue_options_t;
     l_message_properties              DBMS_AQ.message_properties_t;
@@ -91,7 +89,6 @@ package body vm_manager_runtime as
 
   function call_api
   (
-    p_host_name                       vm_hosts.host_name%type,
     p_json_parameters                 clob
   )
   return clob
@@ -109,7 +106,7 @@ package body vm_manager_runtime as
 
       when 'getMessageForHostMonitor' then
 
-        l_json_response := get_message_for_host_monitor(p_host_name, l_json_parameters);
+        l_json_response := get_message_for_host_monitor(l_json_parameters);
 
       when 'getVirtualMachineDescription' then
 
@@ -117,15 +114,15 @@ package body vm_manager_runtime as
 
       when 'registerVmHost' then
 
-        vm_manager.register_vm_host(p_host_name, l_json_parameters);
+        vm_manager.register_vm_host(l_json_parameters);
 
       when 'sendMessageToClient' then
 
-        send_message_to_client(p_host_name, l_json_parameters);
+        send_message_to_client(l_json_parameters);
 
       when 'setVmHostOffline' then
 
-        vm_manager.set_vm_host_offline(p_host_name);
+        vm_manager.set_vm_host_offline;
 
       when 'setVmState' then
 
@@ -133,11 +130,11 @@ package body vm_manager_runtime as
 
       when 'startVirtualMachinesOnHostBoot' then
 
-        vm_manager.start_virtual_machines_on_host_boot(p_host_name);
+        vm_manager.start_virtual_machines_on_host_boot;
 
       when 'updateLifecycleState' then
 
-        vm_manager.update_lifecycle_state(p_host_name, l_json_parameters);
+        vm_manager.update_lifecycle_state(l_json_parameters);
 
       when 'updateVMDescription' then
 
@@ -149,7 +146,7 @@ package body vm_manager_runtime as
 
       when 'validateVmState' then
 
-        vm_manager.validate_vm_state(p_host_name, l_json_parameters);
+        vm_manager.validate_vm_state(l_json_parameters);
 
       else
 

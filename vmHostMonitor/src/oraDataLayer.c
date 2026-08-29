@@ -55,7 +55,7 @@ char *jsonResultStr = NULL;
 static char queueParms[8192];
 static char queueData[8192];
 
-static char *callApiTxt = "begin :jsonResult := vm_manager_runtime.call_api(:hostName, :jsonParameters); end;";
+static char *callApiTxt = "begin :jsonResult := vm_manager_runtime.call_api(:jsonParameters); end;";
 
 static OCIStmt *dbConnStmt = NULL;
 static OCIStmt *qConnStmt = NULL;
@@ -65,8 +65,6 @@ static OCIBind *jsonResultBV = NULL;
 
 static OCIBind *queueParmsBV = NULL;
 static OCIBind *queueDataBV = NULL;
-
-static OCIBind *hostNameBV = NULL;
 
 static sb4 oraErrorCode = OCI_SUCCESS;
 
@@ -290,7 +288,7 @@ OCIError *oraError = NULL;
   return E_SUCCESS;
 }
 
-int connectToDatabase(char *hostName)
+int connectToDatabase(void)
 {
 int rc = E_SUCCESS;
 cJSON *jsonParms = NULL, *item = NULL;
@@ -330,11 +328,6 @@ cJSON *jsonParms = NULL, *item = NULL;
     (ub4) strlen(callApiTxt), (const OraText *) NULL, (ub4) 0, OCI_NTV_SYNTAX, OCI_DEFAULT);
   if (rc) return errorHandler(__FUNCTION__, __LINE__, rc, dbSess.oraError);
 
-  rc = OCIBindByName(dbConnStmt, &hostNameBV, dbSess.oraError, (const OraText *)":hostName", -1,
-    hostName, (ub4) strlen(hostName)+1, SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0,
-    (ub4 *) 0, (sb4) OCI_DEFAULT);
-  if (rc) return errorHandler(__FUNCTION__, __LINE__, rc, dbSess.oraError);
-
   rc = OCIBindByName(dbConnStmt, &jsonResultBV, dbSess.oraError, (const OraText *)":jsonResult", -1,
     jsonResultStr, (ub4) jsonResultStrLength - 1, SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0,
     (ub4 *) 0, (sb4) OCI_DEFAULT);
@@ -353,11 +346,6 @@ cJSON *jsonParms = NULL, *item = NULL;
   if (!rc) return E_MALLOC;
 
   if (jsonParms) cJSON_Delete(jsonParms);
-
-  rc = OCIBindByName(qConnStmt, &hostNameBV, dbSess.oraError, (const OraText *)":hostName", -1,
-    hostName, (ub4) strlen(hostName)+1, SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0,
-    (ub4 *) 0, (sb4) OCI_DEFAULT);
-  if (rc) return errorHandler(__FUNCTION__, __LINE__, rc, dbSess.oraError);
 
   rc = OCIBindByName(qConnStmt, &queueParmsBV, qSess.oraError, (const OraText *)":jsonParameters", -1,
     queueParms, (ub4) strlen(queueParms)+1, SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0,

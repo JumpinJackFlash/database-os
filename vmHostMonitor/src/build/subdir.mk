@@ -20,7 +20,6 @@ C_DEPS += \
 ./logger.d \
 ./memory.d \
 ./oraDataLayer.d \
-./utils.d \
 ./virtualMachines.d \
 ./vmHostMonitor.d \
 ./vmHost.d 
@@ -31,7 +30,6 @@ OBJS += \
 ./logger.o \
 ./memory.o \
 ./oraDataLayer.o \
-./utils.o \
 ./virtualMachines.o \
 ./vmHostMonitor.o \
 ./vmHost.o 
@@ -49,7 +47,7 @@ OBJS += \
 clean: clean--2e-
 
 clean--2e-:
-	-$(RM) ./dbQueueMonitor.d ./dbQueueMonitor.o ./errors.d ./errors.o ./logger.d ./logger.o ./memory.d ./memory.o ./oraDataLayer.d ./oraDataLayer.o ./utils.d ./utils.o ./virtualMachines.d ./virtualMachines.o ./vmHostMonitor.d ./vmHostMonitor.o ./vmHost.d ./vmHost.o
+	-$(RM) ./dbQueueMonitor.d ./dbQueueMonitor.o ./errors.d ./errors.o ./logger.d ./logger.o ./memory.d ./memory.o ./oraDataLayer.d ./oraDataLayer.o ./virtualMachines.d ./virtualMachines.o ./vmHostMonitor.d ./vmHostMonitor.o ./vmHost.d ./vmHost.o
 
 .PHONY: clean--2e-
 
