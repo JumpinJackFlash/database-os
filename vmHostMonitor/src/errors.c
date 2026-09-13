@@ -12,13 +12,13 @@ int jsonError(char *text)
 {
   snprintf(workArea, sizeof(workArea)-1, "JSON item not found: %s", text);
   workArea[sizeof(workArea)-1] = '\0';
-  logOutput(LOG_OUTPUT_ERROR, workArea);
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, workArea);
   return E_JSON_ERROR;
 }
 
 int osErrorHandler(int rc)
 {
-  logOutput(LOG_OUTPUT_ERROR, strerror(errno));
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, strerror(errno));
   return rc;
 }
 

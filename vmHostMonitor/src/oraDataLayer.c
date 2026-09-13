@@ -55,7 +55,7 @@ char *jsonResultStr = NULL;
 static char queueParms[8192];
 static char queueData[8192];
 
-static char *callApiTxt = "begin :jsonResult := vm_manager_runtime.call_api(:hostName, :jsonParameters); end;";
+static char *callApiTxt = "begin :jsonResult := vm_manager_runtime.call_api(:jsonParameters); end;";
 
 static OCIStmt *dbConnStmt = NULL;
 static OCIStmt *qConnStmt = NULL;
@@ -65,8 +65,6 @@ static OCIBind *jsonResultBV = NULL;
 
 static OCIBind *queueParmsBV = NULL;
 static OCIBind *queueDataBV = NULL;
-
-static OCIBind *hostNameBV = NULL;
 
 static sb4 oraErrorCode = OCI_SUCCESS;
 
@@ -140,7 +138,7 @@ int getOraErrorCode(void)
   return (int) oraErrorCode;
 }
 
-static int errorHandler(int rc, OCIError *error)
+static int errorHandler(const char *function, const int line, int rc, OCIError *error)
 {
 int oraReturnCode = E_SUCCESS;
 
@@ -150,7 +148,7 @@ int oraReturnCode = E_SUCCESS;
     oraErrorCode = getOraErrorCode();
     if (oraReturnCode && OCI_USER_REQUESTED_CANCEL != oraErrorCode && OCI_ILLEGAL_PARM_VALUE != oraErrorCode &&
         OCI_QUEUE_TIMEOUT != oraErrorCode && OCI_ARRAY_DQ_FAIL != oraErrorCode)
-      logOutput(LOG_OUTPUT_ERROR, getOraErrorText());
+      logOutput(function, line, LOG_OUTPUT_ERROR, getOraErrorText());
     return oraReturnCode;
   }
 
@@ -162,10 +160,10 @@ int getSessionFromSPool(OCI_CONNECTION *cObj, OCI_SESSION *sObj)
 sword rc = OCI_SUCCESS;
 
   rc = OCIHandleAlloc(cObj->oraEnv, (void *)&sObj->oraError, OCI_HTYPE_ERROR, 0, (dvoid **)0);
-  if (rc) return oraErrorHandler(rc, NULL);
+  if (rc) return E_MALLOC;
 
   rc = OCIHandleAlloc(cObj->oraEnv, (void *)&sObj->authInfo, OCI_HTYPE_AUTHINFO, 0, (dvoid **)0);
-  if (rc) return oraErrorHandler(rc, NULL);
+  if (rc) return E_MALLOC;
 
   rc = OCISessionGet(cObj->oraEnv, sObj->oraError, &sObj->oraSvcCtx, sObj->authInfo, cObj->poolName,
       cObj->poolNameLength, 0, 0, 0, 0, 0, OCI_SESSGET_SPOOL);
@@ -190,14 +188,17 @@ OCIError *oraError = NULL;
   rc = OCIHandleAlloc(cObj->oraEnv, (void *)&oraError, OCI_HTYPE_ERROR, 0, (dvoid **)0);
   if (rc) return oraErrorHandler(rc, NULL);
 
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_VERBOSE, "Attaching to the server...");
   rc = OCIServerAttach(cObj->oraServer, oraError, (OraText *)cObj->database, (sb4)strlen(cObj->database), OCI_DEFAULT);
   if (rc)
   {
-    oraErrorHandler(rc, oraError);
+    logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, "Unable to attach to the server. Check environment variable settings.");
+    rc = errorHandler(__FUNCTION__, __LINE__, rc, oraError);
     OCIHandleFree(oraError, OCI_HTYPE_ERROR);
-    return E_OCI_ERROR;
+    return rc;
   }
 
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_VERBOSE, "Server attached...");
   if (oraError) rc = OCIHandleFree(oraError, OCI_HTYPE_ERROR);
   if (rc) return oraErrorHandler(rc, oraError);
 
@@ -209,9 +210,9 @@ static int reEstablishQueueConnection(void)
 int rc = E_SUCCESS;
 
   rc = getSessionFromSPool(&dbConn, &qSess);
-  if (rc) return errorHandler(rc, NULL);
+  if (rc) return errorHandler(__FUNCTION__, __LINE__, rc, NULL);
 
-  logOutput(LOG_OUTPUT_WARN, "Queue connection re-established.");
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_WARN, "Queue connection re-established.");
 
   return rc;
 }
@@ -219,6 +220,8 @@ int rc = E_SUCCESS;
 static int createOracleSession(OCI_CONNECTION *cObj, OCI_SESSION *sObj)
 {
 sword rc = OCI_SUCCESS;
+
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_VERBOSE, "Creating Oracle Session...");
 
   rc = OCIHandleAlloc(cObj->oraEnv, (void*)&sObj->oraError, OCI_HTYPE_ERROR, 0, (dvoid **)0);
   if (rc) return oraErrorHandler(rc, NULL);
@@ -238,6 +241,7 @@ sword rc = OCI_SUCCESS;
   rc = OCISessionBegin(sObj->oraSvcCtx, sObj->oraError, sObj->oraSession, OCI_CRED_RDBMS, OCI_DEFAULT);
   if (rc)
   {
+    logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, "Unable to create an Oracle Session...");
     oraErrorHandler(rc, sObj->oraError);
     if (OCI_SUCCESS_WITH_INFO != rc) return(E_OCI_ERROR);
   }
@@ -284,59 +288,54 @@ OCIError *oraError = NULL;
   return E_SUCCESS;
 }
 
-int connectToDatabase(char *hostName)
+int connectToDatabase(void)
 {
 int rc = E_SUCCESS;
 cJSON *jsonParms = NULL, *item = NULL;
 
   jsonResultStr = allocateMemory(jsonResultStrLength);
 
-  logOutput(LOG_OUTPUT_ALWAYS, "Connecting to the database...");
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, "Connecting to the database...");
 
   strncpy(dbConn.database, envDatabaseName ? envDatabaseName : configDatabaseName, sizeof(dbConn.database)-1);
   dbConn.database[sizeof(dbConn.database)-1] = '\0';
   rc = connectToOracleAction(&dbConn);
-  if (rc) return errorHandler(rc, NULL);
+  if (rc) return rc;
 
   strncpy(qConn.database, envDatabaseName ? envDatabaseName : configDatabaseName, sizeof(qConn.database)-1);
   qConn.database[sizeof(qConn.database)-1] = '\0';
   rc = connectToOracleAction(&qConn);
-  if (rc) return errorHandler(rc, NULL);
+  if (rc) return rc;
 
   strncpy(qSess.username, envUser ? envUser : configUser, sizeof(qSess.username)-1);
   qSess.username[sizeof(qSess.username)-1] = '\0';
   strncpy(qSess.password, envPassword ? envPassword : configPassword, sizeof(qSess.password)-1);
   qSess.password[sizeof(qSess.password)-1] = '\0';
   rc = createOracleSession(&qConn, &qSess);
-  if (rc) return errorHandler(rc, NULL);
+  if (rc) return errorHandler(__FUNCTION__, __LINE__, rc, NULL);
 
   strncpy(dbSess.username, envUser ? envUser : configUser, sizeof(dbSess.username)-1);
   dbSess.username[sizeof(dbSess.username)-1] = '\0';
   strncpy(dbSess.password, envPassword ? envPassword : configPassword, sizeof(dbSess.password)-1);
   dbSess.password[sizeof(dbSess.password)-1] = '\0';
   rc = createOracleSession(&dbConn, &dbSess);
-  if (rc) return errorHandler(rc, NULL);
+  if (rc) return errorHandler(__FUNCTION__, __LINE__, rc, NULL);
 
   rc = OCIHandleAlloc(dbConn.oraEnv, (void *)&dbConnStmt, OCI_HTYPE_STMT, 0, (dvoid **)0);
   rc = OCIHandleAlloc(qConn.oraEnv, (void *)&qConnStmt, OCI_HTYPE_STMT, 0, (dvoid **)0);
 
   rc = OCIStmtPrepare2(dbSess.oraSvcCtx, &dbConnStmt, dbSess.oraError, (const OraText *)callApiTxt,
     (ub4) strlen(callApiTxt), (const OraText *) NULL, (ub4) 0, OCI_NTV_SYNTAX, OCI_DEFAULT);
-  if (rc) return errorHandler(rc, dbSess.oraError);
-
-  rc = OCIBindByName(dbConnStmt, &hostNameBV, dbSess.oraError, (const OraText *)":hostName", -1,
-    hostName, (ub4) strlen(hostName)+1, SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0,
-    (ub4 *) 0, (sb4) OCI_DEFAULT);
-  if (rc) return errorHandler(rc, dbSess.oraError);
+  if (rc) return errorHandler(__FUNCTION__, __LINE__, rc, dbSess.oraError);
 
   rc = OCIBindByName(dbConnStmt, &jsonResultBV, dbSess.oraError, (const OraText *)":jsonResult", -1,
     jsonResultStr, (ub4) jsonResultStrLength - 1, SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0,
     (ub4 *) 0, (sb4) OCI_DEFAULT);
-  if (rc) return errorHandler(rc, dbSess.oraError);
+  if (rc) return errorHandler(__FUNCTION__, __LINE__, rc, dbSess.oraError);
 
   rc = OCIStmtPrepare2(qSess.oraSvcCtx, &qConnStmt, qSess.oraError, (const OraText *)callApiTxt,
     (ub4) strlen(callApiTxt), (const OraText *) NULL, (ub4) 0, OCI_NTV_SYNTAX, OCI_DEFAULT);
-  if (rc) return errorHandler(rc, qSess.oraError);
+  if (rc) return errorHandler(__FUNCTION__, __LINE__, rc, qSess.oraError);
 
   jsonParms = cJSON_CreateObject();
   if (!jsonParms) return E_JSON_ERROR;
@@ -348,11 +347,6 @@ cJSON *jsonParms = NULL, *item = NULL;
 
   if (jsonParms) cJSON_Delete(jsonParms);
 
-  rc = OCIBindByName(qConnStmt, &hostNameBV, dbSess.oraError, (const OraText *)":hostName", -1,
-    hostName, (ub4) strlen(hostName)+1, SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0,
-    (ub4 *) 0, (sb4) OCI_DEFAULT);
-  if (rc) return errorHandler(rc, dbSess.oraError);
-
   rc = OCIBindByName(qConnStmt, &queueParmsBV, qSess.oraError, (const OraText *)":jsonParameters", -1,
     queueParms, (ub4) strlen(queueParms)+1, SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0,
     (ub4 *) 0, (sb4) OCI_DEFAULT);
@@ -360,7 +354,7 @@ cJSON *jsonParms = NULL, *item = NULL;
   rc = OCIBindByName(qConnStmt, &queueDataBV, qSess.oraError, (const OraText *)":jsonResult", -1,
     queueData, (ub4) sizeof(queueData)-1, SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0,
     (ub4 *) 0, (sb4) OCI_DEFAULT);
-  if (rc) return errorHandler(rc, dbSess.oraError);
+  if (rc) return errorHandler(__FUNCTION__, __LINE__, rc, dbSess.oraError);
 
   pthread_mutex_init(&dbConnMtx, NULL);
 
@@ -369,7 +363,7 @@ cJSON *jsonParms = NULL, *item = NULL;
 
 void closeStatementHandles(void)
 {
-  logOutput(LOG_OUTPUT_INFO, "Closing SQL statement cursors.");
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_INFO, "Closing SQL statement cursors.");
 
   OCIHandleFree(&dbConnStmt, OCI_HTYPE_STMT);
   OCIHandleFree(&qConnStmt, OCI_HTYPE_STMT);
@@ -377,7 +371,7 @@ void closeStatementHandles(void)
 
 int disconnectFromDatabase(void)
 {
-  logOutput(LOG_OUTPUT_INFO, "Disconnecting from the Oracle database.");
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_INFO, "Disconnecting from the Oracle database.");
 
   if (jsonResultStr) freeMemory(jsonResultStr);
 
@@ -434,7 +428,7 @@ int rc = E_SUCCESS;
 
   rc = OCIStmtExecute(dbSess.oraSvcCtx, dbConnStmt, dbSess.oraError, 1, 0, NULL, NULL,
     OCI_COMMIT_ON_SUCCESS);
-  if (rc && OCI_SUCCESS_WITH_INFO != rc && OCI_NO_DATA != rc) rc = errorHandler(rc, dbSess.oraError);
+  if (rc && OCI_SUCCESS_WITH_INFO != rc && OCI_NO_DATA != rc) rc = errorHandler(__FUNCTION__, __LINE__, rc, dbSess.oraError);
 
   if (jsonString) free(jsonString);
 
@@ -475,7 +469,7 @@ int rc = E_SUCCESS;
     goto exit_point;
   }
 
-  logOutput(LOG_OUTPUT_VERBOSE, jsonParametersStr);
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_VERBOSE, jsonParametersStr);
 
   pthread_mutex_lock(&dbConnMtx);
 
@@ -488,7 +482,7 @@ int rc = E_SUCCESS;
 
   pthread_mutex_unlock(&dbConnMtx);
 
-  if (rc && OCI_SUCCESS_WITH_INFO != rc && OCI_NO_DATA != rc) rc = errorHandler(rc, dbSess.oraError);
+  if (rc && OCI_SUCCESS_WITH_INFO != rc && OCI_NO_DATA != rc) rc = errorHandler(__FUNCTION__, __LINE__, rc, dbSess.oraError);
 
 exit_point:
 
@@ -532,7 +526,7 @@ int rc = E_SUCCESS;
 
   pthread_mutex_unlock(&dbConnMtx);
 
-  if (rc && OCI_SUCCESS_WITH_INFO != rc && OCI_NO_DATA != rc) rc = errorHandler(rc, dbSess.oraError);
+  if (rc && OCI_SUCCESS_WITH_INFO != rc && OCI_NO_DATA != rc) rc = errorHandler(__FUNCTION__, __LINE__, rc, dbSess.oraError);
 
 exit_point:
 
@@ -568,7 +562,7 @@ int rc = E_SUCCESS;
 
   rc = OCIStmtExecute(dbSess.oraSvcCtx, dbConnStmt, dbSess.oraError, 1, 0, NULL, NULL,
     OCI_COMMIT_ON_SUCCESS);
-  if (rc && OCI_SUCCESS_WITH_INFO != rc && OCI_NO_DATA != rc) rc = errorHandler(rc, dbSess.oraError);
+  if (rc && OCI_SUCCESS_WITH_INFO != rc && OCI_NO_DATA != rc) rc = errorHandler(__FUNCTION__, __LINE__, rc, dbSess.oraError);
 
 exit_point:
 
@@ -613,7 +607,7 @@ cJSON *jsonParms = NULL, *item = NULL;
     goto exit_point;
   }
 
-  logOutput(LOG_OUTPUT_ALWAYS, jsonParametersStr);
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, jsonParametersStr);
 
   pthread_mutex_lock(&dbConnMtx);
 
@@ -630,12 +624,12 @@ cJSON *jsonParms = NULL, *item = NULL;
 
   if (jsonParms) cJSON_Delete(jsonParms);
 
-  if (rc && OCI_SUCCESS_WITH_INFO != rc && OCI_NO_DATA != rc) return errorHandler(rc, dbSess.oraError);
+  if (rc && OCI_SUCCESS_WITH_INFO != rc && OCI_NO_DATA != rc) return errorHandler(__FUNCTION__, __LINE__, rc, dbSess.oraError);
 
   return rc;
 }
 
-int updateVmState(const char *domainName, const char *stateText)
+int setVmState(const char *domainName, const char *stateText)
 {
 int rc = E_SUCCESS;
 cJSON *jsonParms = NULL, *item = NULL;
@@ -643,7 +637,7 @@ cJSON *jsonParms = NULL, *item = NULL;
   jsonParms = cJSON_CreateObject();
   if (!jsonParms) return E_JSON_ERROR;
 
-  item = cJSON_AddStringToObject(jsonParms, "entryPoint", "updateVmState");
+  item = cJSON_AddStringToObject(jsonParms, "entryPoint", "setVmState");
   if (!item)
   {
     rc = jsonError("entryPoint");
@@ -671,7 +665,7 @@ cJSON *jsonParms = NULL, *item = NULL;
     goto exit_point;
   }
 
-  logOutput(LOG_OUTPUT_ALWAYS, jsonParametersStr);
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, jsonParametersStr);
 
   retry:
 
@@ -692,7 +686,55 @@ cJSON *jsonParms = NULL, *item = NULL;
 
   if (jsonParms) cJSON_Delete(jsonParms);
 
-  if (rc && OCI_SUCCESS_WITH_INFO != rc && OCI_NO_DATA != rc) return errorHandler(rc, dbSess.oraError);
+  if (rc && OCI_SUCCESS_WITH_INFO != rc && OCI_NO_DATA != rc) return errorHandler(__FUNCTION__, __LINE__, rc, dbSess.oraError);
+
+  return rc;
+}
+
+int startVirtualMachinesOnHostBoot(void)
+{
+int rc = E_SUCCESS;
+cJSON *jsonParms = NULL, *item = NULL;
+
+  jsonParms = cJSON_CreateObject();
+  if (!jsonParms) return E_JSON_ERROR;
+
+  item = cJSON_AddStringToObject(jsonParms, "entryPoint", "startVirtualMachinesOnHostBoot");
+  if (!item)
+  {
+    rc = jsonError("entryPoint");
+    goto exit_point;
+  }
+
+  rc = cJSON_PrintPreallocated(jsonParms, jsonParametersStr, sizeof(jsonParametersStr), 0);
+  if (!rc)
+  {
+    rc = E_MALLOC;
+    goto exit_point;
+  }
+
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, jsonParametersStr);
+
+  retry:
+
+  pthread_mutex_lock(&dbConnMtx);
+
+  rc = OCIBindByName(dbConnStmt, &jsonParmsBV, dbSess.oraError,
+    (const OraText *)":jsonParameters", -1, jsonParametersStr, (ub4) strlen(jsonParametersStr)+1,
+    SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0, (ub4 *) 0, (sb4) OCI_DEFAULT);
+
+  rc = OCIStmtExecute(dbSess.oraSvcCtx, dbConnStmt, dbSess.oraError, 1, 0, NULL, NULL,
+    OCI_COMMIT_ON_SUCCESS);
+
+  pthread_mutex_unlock(&dbConnMtx);
+
+  if (OCI_PACKAGE_STATE_DISCARDED == rc) goto retry;
+
+  exit_point:
+
+  if (jsonParms) cJSON_Delete(jsonParms);
+
+  if (rc && OCI_SUCCESS_WITH_INFO != rc && OCI_NO_DATA != rc) return errorHandler(__FUNCTION__, __LINE__, rc, dbSess.oraError);
 
   return rc;
 }
@@ -707,7 +749,7 @@ cJSON *jsonParms = (cJSON *)vjsonParms;
   rc = cJSON_PrintPreallocated(jsonParms, jsonParametersStr, sizeof(jsonParametersStr), 0);
   if (!rc) return E_MALLOC;
 
-  logOutput(LOG_OUTPUT_ALWAYS, jsonParametersStr);
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, jsonParametersStr);
 
   pthread_mutex_lock(&dbConnMtx);
 
@@ -720,7 +762,7 @@ cJSON *jsonParms = (cJSON *)vjsonParms;
 
   pthread_mutex_unlock(&dbConnMtx);
 
-  if (rc && OCI_SUCCESS_WITH_INFO != rc && OCI_NO_DATA != rc) return errorHandler(rc, dbSess.oraError);
+  if (rc && OCI_SUCCESS_WITH_INFO != rc && OCI_NO_DATA != rc) return errorHandler(__FUNCTION__, __LINE__, rc, dbSess.oraError);
 
   return rc;
 }
@@ -738,7 +780,7 @@ retry:
   rc = OCIStmtExecute(qSess.oraSvcCtx, qConnStmt, qSess.oraError, 1, 0, NULL, NULL, OCI_DEFAULT);
   if (rc && OCI_SUCCESS_WITH_INFO != rc && OCI_NO_DATA != rc)
   {
-    errorHandler(rc, qSess.oraError);
+    errorHandler(__FUNCTION__, __LINE__, rc, qSess.oraError);
 
     if (OCI_QUEUE_TIMEOUT == oraErrorCode || OCI_PACKAGE_STATE_DISCARDED == oraErrorCode) goto retry;
 
@@ -792,10 +834,10 @@ int breakDqSession(void)
 int rc = E_SUCCESS;
 
   OCIBreak(qSess.oraSvcCtx, qSess.oraError);
-  if (rc) errorHandler(rc, qSess.oraError);
+  if (rc) errorHandler(__FUNCTION__, __LINE__, rc, qSess.oraError);
 
   OCIReset(qSess.oraSvcCtx, qSess.oraError);
-  if (rc) errorHandler(rc, qSess.oraError);
+  if (rc) errorHandler(__FUNCTION__, __LINE__, rc, qSess.oraError);
 
   return E_SUCCESS;
 }
@@ -832,7 +874,7 @@ int updateVmXMLDescription(char *machineName, char *xmlDescription)
 
   rc = OCIStmtExecute(dbSess.oraSvcCtx, dbConnStmt, dbSess.oraError, 1, 0, NULL, NULL,
     OCI_COMMIT_ON_SUCCESS);
-  if (rc && OCI_SUCCESS_WITH_INFO != rc && OCI_NO_DATA != rc) rc = errorHandler(rc, dbSess.oraError);
+  if (rc && OCI_SUCCESS_WITH_INFO != rc && OCI_NO_DATA != rc) rc = errorHandler(__FUNCTION__, __LINE__, rc, dbSess.oraError);
 
   pthread_mutex_unlock(&dbConnMtx);
 
@@ -856,7 +898,7 @@ int rc = E_SUCCESS, newJsonResultStrLength = xmlDescriptionLength + 256;
     rc = OCIBindByName(dbConnStmt, &jsonResultBV, dbSess.oraError, (const OraText *)":jsonResult", -1,
       jsonResultStr, (ub4) jsonResultStrLength - 1, SQLT_STR, NULL, (ub2 *)0, (ub2 *)0, (ub4) 0,
       (ub4 *) 0, (sb4) OCI_DEFAULT);
-    if (rc) return errorHandler(rc, dbSess.oraError);
+    if (rc) return errorHandler(__FUNCTION__, __LINE__, rc, dbSess.oraError);
   }
 
   jsonParms = cJSON_CreateObject();
@@ -888,7 +930,7 @@ retry:
 
   if (rc && OCI_SUCCESS_WITH_INFO != rc && OCI_NO_DATA != rc)
   {
-    rc = errorHandler(rc, dbSess.oraError);
+    rc = errorHandler(__FUNCTION__, __LINE__, rc, dbSess.oraError);
     if (OCI_PACKAGE_STATE_DISCARDED == oraErrorCode) goto retry;
   }
 

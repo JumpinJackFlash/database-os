@@ -22,15 +22,15 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <systemd/sd-daemon.h>
-
+#include <openssl/evp.h>
 #include <cjson/cJSON.h>
 
 #include "vmHostMonitorDefs.h"
 #include "oraDataLayer.h"
-#include "vmHosts.h"
 #include "dbQueueMonitor.h"
 #include "errors.h"
 #include "logger.h"
+#include "vmHost.h"
 
 static char cmdLineConfigFile[PATH_MAX];
 static char configFilePath[PATH_MAX];
@@ -59,6 +59,64 @@ char *envDatabaseName;
 char *envOracleHome;
 
 char hostName[HOST_NAME_MAX];
+
+#define EVP_BUFFER_SIZE 4096
+
+int computeSha256Hash(const char *filename)
+{
+FILE *file = NULL;
+EVP_MD_CTX *mdctx = NULL;
+unsigned char buffer[EVP_BUFFER_SIZE], hash[EVP_MAX_MD_SIZE];
+unsigned int hash_len;
+
+  file = fopen(filename, "rb");
+  if (!file)
+  {
+    perror("Unable to open file");
+    return -1;
+  }
+
+  // Initialize OpenSSL EVP Context for SHA-256
+  mdctx = EVP_MD_CTX_new();
+  if (mdctx == NULL)
+  {
+    fclose(file);
+    return -1;
+  }
+
+  if (EVP_DigestInit_ex(mdctx, EVP_sha256(), NULL) != 1)
+  {
+    EVP_MD_CTX_free(mdctx);
+    fclose(file);
+    return -1;
+  }
+
+  // Read file in chunks and stream into the hash context
+  size_t bytes_read;
+  while ((bytes_read = fread(buffer, 1, EVP_BUFFER_SIZE, file)) > 0)
+  {
+    if (EVP_DigestUpdate(mdctx, buffer, bytes_read) != 1)
+    {
+      EVP_MD_CTX_free(mdctx);
+      fclose(file);
+      return -1;
+    }
+  }
+
+  // Finalize the hash computation
+  if (EVP_DigestFinal_ex(mdctx, hash, &hash_len) != 1)
+  {
+    EVP_MD_CTX_free(mdctx);
+    fclose(file);
+    return -1;
+  }
+
+  // Clean up resources
+  EVP_MD_CTX_free(mdctx);
+  fclose(file);
+
+  return E_SUCCESS;
+}
 
 int openConfigFile(char *configFilePath)
 {
@@ -183,7 +241,7 @@ int rc = E_SUCCESS;
       return rc;
   }
 
-  logOutput(LOG_OUTPUT_ERROR, option);
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, option);
   return E_CONFIG_OPTION;
 }
 
@@ -192,7 +250,7 @@ static int parseConfigOptions(void)
 char *option = NULL, *value = NULL;
 int rc = E_SUCCESS;
 
-  logOutput(LOG_OUTPUT_INFO, "Processing configuration options.");
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_INFO, "Processing configuration options.");
 
   while (E_EOF != getNextConfigurationOption(&option, &value))
   {
@@ -237,7 +295,11 @@ stillAlive:
   rc = sleep(systemdTimeout);
   if (rc) return NULL;
 
-  if (heartbeatTerminated) pthread_exit((void *) NULL);
+  if (heartbeatTerminated)
+  {
+    logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_INFO, "heartbeatThread exiting...");
+    pthread_exit((void *) NULL);
+  }
 
   goto stillAlive;
 
@@ -254,7 +316,7 @@ static int startSystemdHeartbeat(void)
   systemdTimeout *= USEC_TO_SEC_FACTOR;
   systemdTimeout -= (int) (systemdTimeout * WAKE_UP_EARLY_PERCENT);
   sprintf(sText2Log, "Watchdog/Heartbeat Interval: %ld", systemdTimeout);
-  logOutput(LOG_OUTPUT_ALWAYS, sText2Log);
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, sText2Log);
 
   return pthread_create(&heartbeatThreadID, NULL, heartbeatThread, (void *)NULL);
 }
@@ -273,14 +335,14 @@ int rc = E_SUCCESS;
 
   if (daemonize)
   {
-    logOutput(LOG_OUTPUT_ALWAYS, "The VM Host Monitor is now running as a background process.");
+    logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, "The VM Host Monitor is now running as a background process.");
     rc = daemon(FALSE, FALSE);
     if (rc)
     {
       snprintf(text2Log, sizeof(text2Log), "daemon failed...%d - %s", rc, strerror(errno));
       snprintf(text2Log, sizeof(text2Log), "daemon failed...%d", rc);
-      logOutput(LOG_OUTPUT_ERROR, text2Log);
-      logOutput(LOG_OUTPUT_ERROR, strerror(errno));
+      logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, text2Log);
+      logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, strerror(errno));
     }
   }
 }
@@ -294,7 +356,7 @@ static int createPidFile(const char *programName)
 
   snprintf(pidFilename, sizeof(pidFilename), "%s/%s.pid", PID_FILE_PREFIX, programName);
   snprintf(text2Log, sizeof(text2Log), "Opening PID file: %s", pidFilename);
-  logOutput(LOG_OUTPUT_ALWAYS, text2Log);
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, text2Log);
 
   if (strchr(programName, '/'))
   {
@@ -304,7 +366,7 @@ static int createPidFile(const char *programName)
     rc = mkdir(pidDirectory, S_IRWXU);
     if (rc && EEXIST != errno)
     {
-      logOutput(LOG_OUTPUT_ERROR, strerror(errno));
+      logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, strerror(errno));
       return E_CREATE_PID_FILE;
     }
   }
@@ -312,7 +374,7 @@ static int createPidFile(const char *programName)
   pidFile = open(pidFilename, O_RDWR | O_CREAT | O_CLOEXEC, S_IRUSR | S_IWUSR);
   if (-1 == pidFile)
   {
-    logOutput(LOG_OUTPUT_ERROR, strerror(errno));
+    logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, strerror(errno));
     return E_CREATE_PID_FILE;
   }
 
@@ -332,18 +394,7 @@ static int createPidFile(const char *programName)
 
   write(pidFile, pidX, strlen(pidX));
 
-  return E_SUCCESS;
-}
-
-int rewritePidFile(void)
-{
-  char pidX[MAX_PID_SIZE];
-
-  bzero(pidX, sizeof(pidX));
-  snprintf(pidX, sizeof(pidX), "%d", getpid());
-
-  lseek(pidFile, 0, SEEK_SET);
-  write(pidFile, pidX, strlen(pidX));
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, "success");
 
   return E_SUCCESS;
 }
@@ -360,6 +411,8 @@ int rc = E_SUCCESS;
 
   startupPreamble(PROGRAM_NAME, __DATE__, __TIME__);
 
+  computeSha256Hash(argv[0]);
+
   rc = processCommandLine(argc, argv);
   if (rc) goto exitPoint;
 
@@ -369,6 +422,9 @@ int rc = E_SUCCESS;
   snprintf(configFilePath, sizeof(configFilePath), "%s%cconfig%c%s", homeDirectory, DIRECTORY_SEPARATOR,
     DIRECTORY_SEPARATOR, cmdLineConfigFile[0] ? cmdLineConfigFile : CONFIG_FILE);
   configFilePath[sizeof(configFilePath)-1] = '\0';
+
+  snprintf(text2Log, sizeof(text2Log), "Opening configuration file: %s", configFilePath);
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, text2Log);
 
   rc = processConfigFile();
   if (rc) goto exitPoint;
@@ -380,8 +436,6 @@ int rc = E_SUCCESS;
   rc = openLogFile(PROGRAM_NAME, homeDirectory);
   if (rc) goto exitPoint;
   writePreambleToLogfile(PROGRAM_NAME, __DATE__, __TIME__);
-  snprintf(text2Log, sizeof(text2Log), "Opening configuration file: %s", configFilePath);
-  logOutput(LOG_OUTPUT_ALWAYS, text2Log);
 
   rc = createPidFile(PROGRAM_NAME);
   if (rc) goto exitPoint;
@@ -393,11 +447,11 @@ int rc = E_SUCCESS;
 
   prctl(PR_SET_DUMPABLE, 1);
 
-  rc = connectToDatabase(hostName);
+  rc = connectToDatabase();
   if (rc) goto exitPoint;
 
   snprintf(text2Log, sizeof(text2Log), "%s is online...", PROGRAM_NAME);
-  logOutput(LOG_OUTPUT_ALWAYS, text2Log);
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, text2Log);
 
   rc = setupEventLoop();
 
@@ -406,13 +460,16 @@ int rc = E_SUCCESS;
 
   startQueueThread();
 
+  rc = startVirtualMachinesOnHostBoot();
+  if (rc) goto exitPoint;
+
   rc = monitorDomainEvents();
 
   disconnectFromVmHost();
 
 exitPoint:
 
-  if (rc) logOutput(LOG_OUTPUT_ERROR, getErrorText(rc));
+  if (rc) logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, getErrorText(rc));
 
   terminateSystemdHeartbeat();
 
@@ -422,7 +479,7 @@ exitPoint:
   disconnectFromDatabase();
 
   snprintf(text2Log, sizeof(text2Log), "%s shutdown complete...", PROGRAM_NAME);
-  logOutput(LOG_OUTPUT_ALWAYS, text2Log);
+  logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ALWAYS, text2Log);
 
   closeLogFile();
 
@@ -431,9 +488,9 @@ exitPoint:
 #ifdef MEMORY_COUNT
   if (checkMemoryCount())
   {
-    logOutput(LOG_OUTPUT_ERROR, "Memory leak...");
+    logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, "Memory leak...");
     sprintf(text2Log, "Allocated: %ld - Freed: %ld", getMallocCount(), getFreeCount());
-    logOutput(LOG_OUTPUT_ERROR, text2Log);
+    logOutput(__FUNCTION__, __LINE__, LOG_OUTPUT_ERROR, text2Log);
   }
 #endif
 

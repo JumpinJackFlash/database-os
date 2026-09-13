@@ -21,7 +21,7 @@ as
 -- Error codes and messages. DbTwig has reserved -20000 to -20199. Start with -20200
 
   UNAUTHORIZED_VM_DETECTED            constant pls_integer := -20200;
-  UNAUTHORIZED_VM_DETECTED_EMSG       constant varchar2(45) := 'A VM was detected that should not be running.';
+  UNAUTHORIZED_VM_DETECTED_EMSG       constant varchar2(32) := 'An unregistered VM was detected.';
 
   VM_STATE_MISMATCH                   constant pls_integer := -20201;
   VM_STATE_MISMATCH_EMSG              constant varchar2(33) := 'A VM state mismatch was detected.';
@@ -237,7 +237,6 @@ as
 
   procedure register_vm_host
   (
-    p_host_name                       vm_hosts.host_name%type,
     p_json_parameters                 json_object_t
   );
 
@@ -246,22 +245,21 @@ as
     p_message                         dbos$message_t
   );
 
-  procedure set_persistent
-  (
-    p_virtual_machine_id              virtual_machines.virtual_machine_id%type,
-    p_persistent                      virtual_machines.persistent%type
-  );
+  procedure set_vm_host_offline;
 
-  procedure set_vm_host_offline
+  procedure set_vm_state
   (
-    p_host_name                       vm_hosts.host_name%type
+    p_json_parameters                 json_object_t
   );
 
   procedure start_virtual_machine
   (
     p_session_id                      varchar2,
-    p_virtual_machine_id              virtual_machines.virtual_machine_id%type
+    p_virtual_machine_id              virtual_machines.virtual_machine_id%type,
+    p_api_user_id                     virtual_machines.api_user_id%type default null
   );
+
+  procedure start_virtual_machines_on_host_boot;
 
   procedure stop_virtual_machine
   (
@@ -270,7 +268,6 @@ as
 
   procedure update_lifecycle_state
   (
-    p_host_name                       vm_hosts.host_name%type,
     p_json_parameters                 json_object_t
   );
 
@@ -279,19 +276,22 @@ as
     p_json_parameters                 json_object_t
   );
 
-  procedure update_vm_info
+  procedure update_vm_details
   (
-    p_json_parameters                 json_object_t
+    p_virtual_machine_id              virtual_machines.virtual_machine_id%type,
+    p_persistent                      virtual_machines.persistent%type,
+    p_start_on_host_boot              virtual_machines.start_on_host_boot%type,
+    p_vcpu_count                      virtual_machines.vcpu_count%type,
+    p_virtual_memory                  virtual_machines.virtual_memory%type
   );
 
-  procedure update_vm_state
+  procedure update_vm_info
   (
     p_json_parameters                 json_object_t
   );
 
   procedure validate_vm_state
   (
-    p_host_name                       vm_hosts.host_name%type,
     p_json_parameters                 json_object_t
   );
 

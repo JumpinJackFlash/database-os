@@ -19,8 +19,8 @@
 #define DIRECTORY_SEPARATOR                     '/'
 
 #define HOME_ENVAR                              "ASTERION"
-#define RUNTIME_USER_ENVAR                      "RUNTIME_USER"
-#define RUNTIME_PASSWORD_ENVAR                  "RUNTIME_PASSWORD"
+#define RUNTIME_USER_ENVAR                      "DBOS_RUNTIME"
+#define RUNTIME_PASSWORD_ENVAR                  "DBOS_RUNTIME_PASSWORD"
 #define DATABASE_NAME_ENVAR                     "DATABASE_NAME"
 #define ORACLE_HOME_ENVAR                       "ORACLE_HOME"
 #define MAX_PID_SIZE                            32
@@ -44,7 +44,7 @@
 #define OCI_TNS_BREAK                           12152
 
 // These are tied to error values used by the data-layer API.
-#define DBOS_INVALID_VM_STATE                   20101
+#define DBOS_INVALID_VM_STATE                   20201
 
 #define OCI_ILLEGAL_PARM_VALUE                  24801                     // This is the stupid return code for terminating stream reads...
 #define OCI_QUEUE_TIMEOUT                       25228

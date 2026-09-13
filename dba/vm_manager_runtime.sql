@@ -5,7 +5,6 @@ as
 
   function call_api
   (
-    p_host_name                       vm_hosts.host_name%type,
     p_json_parameters                 clob
   )
   return clob;

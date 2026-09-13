@@ -1,0 +1,23 @@
+# Edit this file as necessary and place it in /usr/lib/systemd/system
+# Edit the 'asterion' environment file and place it in /etc/sysconfig
+# Reload systemctl daemon with systemctl daemon-reload
+# Enable the service with systemctl enable vmHostMonitor
+
+[Unit]
+Description=AsterionDB Virtual Machine Host Monitor
+After=multi-user.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/sysconfig/asterion
+# Use the ExecStartPre option to ensure that the services start after Oracle on local installations.
+# Edit the waitForOracle.sh script appropriately.
+# ExecStartPre=/home/asterion/asterion/oracle/win/waitForOracle.sh
+ExecStart=/home/asterion/asterion/oracle/bin/vmHostMonitor
+WatchdogSec=60
+User=asterion
+Group=asterion
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

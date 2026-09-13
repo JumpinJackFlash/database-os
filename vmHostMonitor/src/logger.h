@@ -1,8 +1,8 @@
 #ifndef LOGGER_H_
 #define LOGGER_H_
 
-void logOutput(int pLogLevel, char *textToLog);
-void logOutputNoCRLF(int pLogLevel, char *textToLog);
+void logOutput(const char *function, const int line, int pLogLevel, char *textToLog);
+void logOutputNoCRLF(const char *function, const int line, int pLogLevel, char *textToLog);
 int openLogFile(char *fileName, char *homeDirectory);
 int closeLogFile(void);
 void startupPreamble(char *programName, char *buildDate, char *buildTime);

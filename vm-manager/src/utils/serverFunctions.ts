@@ -36,6 +36,9 @@ async function callDbTwig(apiCall: string, body?: object)
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + bearerToken },
     };
 
+  // @ts-ignore
+  if (null === bearerToken) delete requestOptions.headers.Authorization;
+
   const httpResponse = await fetch(process.env.DB_TWIG_URL + '/' + apiCall, requestOptions);
 //  const jsonData = 200 === httpResponse.status ? await httpResponse.json() : null;
   const response =
@@ -88,6 +91,7 @@ export async function createUserSession(identification: string, password: string
   const bodyData = { identification, password };
   const response = await callDbTwig('icam/createUserSession', bodyData);
   console.log(response);
+  console.log(response.jsonData.errorMessage);
   if (response.ok) await createSessionCookie(response.jsonData.sessionId, response.jsonData.accountType);
   return response;
 }
@@ -146,13 +150,6 @@ export async function getVmHosts()
   return response;
 }
 
-export async function setPersistentFlag(virtualMachineId: number, persistent: string)
-{
-  const bodyData = { virtualMachineId, persistent };
-  const response = await callDbTwig('dbos/setPersistent', bodyData);
-  return response;
-}
-
 export async function startVirtualMachine(virtualMachineId: number)
 {
   const bodyData = { virtualMachineId: virtualMachineId };
@@ -173,3 +170,11 @@ export async function terminateUserSession()
   if (response.ok) await deleteSessionCookie();
   return response;
 }
+
+export async function updateVm(virtualMachineId: number, persistent: string, startOnHostBoot: string, vCpus: number, vMemory: number)
+{
+  const bodyData = { virtualMachineId, persistent, startOnHostBoot, vCpus, vMemory };
+  const response = await callDbTwig('dbos/updateVmDetails', bodyData);
+  return response;
+}
+
